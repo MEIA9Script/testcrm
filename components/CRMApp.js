@@ -1070,10 +1070,12 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
   const fileRef = useRef(null);
   const [targetFlow, setTargetFlow] = useState(flows[0]?.id || "");
   const [busy, setBusy] = useState(false);
+  const [pendingImport, setPendingImport] = useState(null);
 
   const handleFile = async (file) => {
     if (!file) return;
     setBusy(true);
+    setPendingImport(null);
     try {
       const rows = await readWorkbookFile(file);
       const flow = flows.find(f => f.id === targetFlow);
@@ -1101,25 +1103,56 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
         });
       }
 
-      if (newCompanies.length > 0) {
-        await saveCompanies([...companies, ...newCompanies]);
-      }
-      onResult({
-        message: `✅ ${newCompanies.length} empresa(s) importada(s)${skipped.length > 0 ? `, ${skipped.length} pulada(s) por já existir` : ""}.`,
-        skipped,
-      });
+      setPendingImport({ newCompanies, skipped });
     } catch (err) {
-      onResult({ error: true, message: "⚠️ Não foi possível importar o arquivo. Verifique se é um .csv ou .xlsx válido." });
+      onResult({ error: true, message: "⚠️ Não foi possível ler o arquivo. Verifique se é um .csv ou .xlsx válido." });
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
 
+  const confirmImport = async () => {
+    if (!pendingImport) return;
+    setBusy(true);
+    const { newCompanies, skipped } = pendingImport;
+    if (newCompanies.length > 0) {
+      await saveCompanies([...companies, ...newCompanies]);
+    }
+    onResult({
+      message: `✅ ${newCompanies.length} empresa(s) importada(s)${skipped.length > 0 ? `, ${skipped.length} pulada(s) por já existir` : ""}.`,
+      skipped,
+    });
+    setPendingImport(null);
+    setBusy(false);
+  };
+
+  const cancelImport = () => {
+    setPendingImport(null);
+  };
+
   return (
     <ConfigCard icon={Upload} color="#38BDF8" title="Importar empresas" description="Envie um .csv ou .xlsx com as colunas Nome, Telefone, Email, Segmento. Empresas com nome já cadastrado são puladas automaticamente.">
       {flows.length === 0 ? (
         <div style={{ fontSize: 12, color: "#F87171" }}>Crie um fluxo primeiro na aba “Fluxos” pra poder importar.</div>
+      ) : pendingImport ? (
+        <div style={{ background: "#070A12", border: "1px solid #38BDF850", borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 13, color: "#F1F5F9", marginBottom: 12, fontWeight: 700 }}>
+            Arquivo lido com sucesso!
+          </div>
+          <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 16 }}>
+            Encontramos <strong style={{ color: "#38BDF8" }}>{pendingImport.newCompanies.length}</strong> empresa(s) válidas para importar.
+            {pendingImport.skipped.length > 0 && <span> E <strong style={{ color: "#F87171" }}>{pendingImport.skipped.length}</strong> empresa(s) serão puladas pois já existem no sistema.</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={confirmImport} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #38BDF8, #0284C7)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: busy ? "default" : "pointer" }}>
+              <Check size={14} /> {busy ? "Salvando…" : "Confirmar Importação"}
+            </button>
+            <button onClick={cancelImport} disabled={busy} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #1E293B", background: "transparent", color: "#94A3B8", fontSize: 12, fontWeight: 700, cursor: busy ? "default" : "pointer" }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           <FieldLabel>Fluxo de destino</FieldLabel>
@@ -1128,7 +1161,7 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
           </select>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
           <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 9, border: "1px solid #38BDF840", background: "#38BDF815", color: "#7DD3FC", fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer" }}>
-            <Upload size={13} /> {busy ? "Importando…" : "Escolher arquivo (.csv ou .xlsx)"}
+            <Upload size={13} /> {busy ? "Lendo arquivo…" : "Escolher arquivo (.csv ou .xlsx)"}
           </button>
         </>
       )}
