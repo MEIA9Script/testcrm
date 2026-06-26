@@ -1764,8 +1764,14 @@ function FlowsView({ flows, saveFlows, companies }) {
 
   const activeFlow = flows.find(f => f.id === activeFlowId);
 
-  const createFlow = async (name) => {
-    const newFlow = { id: uid("flow"), name, stages: [] };
+  const createFlow = async (name, stageNames) => {
+    const stages = stageNames.map((n, i) => ({
+      id: uid("st"),
+      name: n,
+      color: STAGE_COLORS[i % STAGE_COLORS.length],
+      activities: [],
+    }));
+    const newFlow = { id: uid("flow"), name, stages };
     await saveFlows([...flows, newFlow]);
     setActiveFlowId(newFlow.id);
     setShowNewFlow(false);
@@ -1829,17 +1835,67 @@ function FlowsView({ flows, saveFlows, companies }) {
 
 function NewFlowModal({ onClose, onCreate }) {
   const [name, setName] = useState("");
+  const [stages, setStages] = useState([
+    "Entrada de Leads",
+    "Contato Realizado",
+    "Contato com Decisor",
+    "Entrega de Material",
+    "Reunião de apresentação",
+  ]);
+
+  const updateStage = (idx, val) => {
+    const next = [...stages];
+    next[idx] = val;
+    setStages(next);
+  };
+
+  const removeStage = (idx) => {
+    setStages(stages.filter((_, i) => i !== idx));
+  };
+
+  const canSave = name.trim() && stages.some(s => s.trim());
+
   return (
     <ModalShell onClose={onClose} title="Novo fluxo">
       <FieldLabel>Nome do fluxo</FieldLabel>
       <TextInput value={name} onChange={setName} placeholder="Ex: Cadência Restaurantes" autoFocus />
-      <button
-        onClick={() => name.trim() && onCreate(name.trim())}
-        disabled={!name.trim()}
-        style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 9, border: "none", background: name.trim() ? "linear-gradient(135deg, #6366F1, #38BDF8)" : "#1E293B", color: name.trim() ? "#fff" : "#475569", fontWeight: 800, fontSize: 13.5, cursor: name.trim() ? "pointer" : "not-allowed" }}
-      >
-        Criar fluxo vazio
-      </button>
+      
+      <div style={{ marginTop: 16 }}>
+        <FieldLabel>Etapas Padrão</FieldLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {stages.map((st, i) => (
+            <div key={i} style={{ display: "flex", gap: 8 }}>
+              <input
+                value={st}
+                onChange={e => updateStage(i, e.target.value)}
+                style={{ flex: 1, padding: "8px 12px", background: "#0D1120", border: "1px solid #141A2B", borderRadius: 8, fontSize: 12.5, color: "#E2E8F0", outline: "none" }}
+              />
+              <button onClick={() => removeStage(i)} title="Remover etapa" style={{ padding: "0 10px", background: "#1E293B", border: "none", borderRadius: 8, color: "#F87171", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setStages([...stages, "Nova etapa"])} style={{ marginTop: 8, padding: "8px", width: "100%", background: "transparent", border: "1px dashed #334155", borderRadius: 8, color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>
+          + Adicionar etapa
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+        <button
+          onClick={() => canSave && onCreate(name.trim(), stages.filter(s => s.trim()))}
+          disabled={!canSave}
+          style={{ flex: 1, padding: "11px", borderRadius: 9, border: "none", background: canSave ? "linear-gradient(135deg, #6366F1, #38BDF8)" : "#1E293B", color: canSave ? "#fff" : "#475569", fontWeight: 800, fontSize: 13.5, cursor: canSave ? "pointer" : "not-allowed" }}
+        >
+          Aceitar e Criar
+        </button>
+        <button
+          onClick={onClose}
+          style={{ flex: 1, padding: "11px", borderRadius: 9, border: "1px solid #1E293B", background: "transparent", color: "#94A3B8", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
     </ModalShell>
   );
 }
