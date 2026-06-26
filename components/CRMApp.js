@@ -40,40 +40,42 @@ const SAMPLE_FLOW = {
     {
       id: "st1", name: "Entrada de Leads", color: "#818CF8",
       activities: [
-        { id: "a1", day: 1, channel: "whatsapp", title: "Primeira mensagem", script: "Olá, aqui é a [empresa]? 👋\nAguarda resposta antes de enviar qualquer outra coisa." },
-        { id: "a2", day: 1, channel: "whatsapp", title: "Após resposta segunda mensagem", script: "Oi! Sou o [nome], da Nexsite — criamos sites e landing pages para empresas aqui da região. Vi que vocês ainda não têm um site (ou o de vocês pode estar deixando cliente ir embora). Posso te mostrar o que fazemos em 2 minutinhos?\nDor: empresa sem site perde credibilidade e vendas todo dia." },
+        { id: "a1", day: 1, time: "08:00", channel: "whatsapp", title: "Primeira mensagem", script: "Olá, aqui é a [empresa]? 👋\nAguarda resposta antes de enviar qualquer outra coisa." },
+        { id: "a2", day: 1, time: "09:00", channel: "whatsapp", title: "Após resposta segunda mensagem", script: "Oi! Sou o [nome], da Nexsite — criamos sites e landing pages para empresas aqui da região. Vi que vocês ainda não têm um site (ou o de vocês pode estar deixando cliente ir embora). Posso te mostrar o que fazemos em 2 minutinhos?\nDor: empresa sem site perde credibilidade e vendas todo dia." },
       ],
     },
     {
       id: "st2", name: "Contato Realizado", color: "#38BDF8",
       activities: [
-        { id: "b1", day: 1, channel: "ligacao", title: "Todo dia até resposta", script: "Oi, tudo bem? Sou o [nome] da Nexsite. Mandei mensagem no WhatsApp — vocês têm site? Muita empresa aqui em Sorriso perde cliente pra concorrente só porque não aparece no Google.\nObjetivo: confirmar quem atendeu e checar se é o decisor." },
-        { id: "b2", day: 2, channel: "ligacao", title: "Sem resposta", script: "Tentativa 2. Mesma abordagem, reforça a dor: \"cliente pesquisa no Google, não te acha, vai pro concorrente.\"\nSe não atender 3x → email de follow-up." },
-        { id: "b3", day: 3, channel: "email", title: "Quando não atende ligação fallback", script: "Assunto: Sua empresa aparece no Google?\n\nCorpo curto: apresentação em 3 linhas + link do portfólio + convite pra conversa.\nDispara após 2–3 tentativas sem resposta na ligação." },
+        { id: "b1", day: 1, time: "09:00", channel: "ligacao", title: "Ligação — tentativa manhã", script: "Oi, tudo bem? Sou o [nome] da Nexsite. Mandei mensagem no WhatsApp — vocês têm site? Muita empresa aqui perde cliente pra concorrente só porque não aparece no Google.\nObjetivo: confirmar quem atendeu e checar se é o decisor." },
+        { id: "b2", day: 1, time: "12:30", channel: "ligacao", title: "Ligação — tentativa almoço", script: "Boa tarde! Aqui é o [nome] da Nexsite. Tentei mais cedo mas não consegui — tem um minutinho pra conversar agora?" },
+        { id: "b3", day: 2, time: "09:00", channel: "ligacao", title: "Ligação — dia 2 sem resposta", script: "Tentativa 2. Mesma abordagem, reforça a dor: \"cliente pesquisa no Google, não te acha, vai pro concorrente.\"" },
+        { id: "b4", day: 3, time: "08:00", channel: "email", title: "E-mail fallback", script: "Assunto: Sua empresa aparece no Google?\n\nCorpo curto: apresentação em 3 linhas + link do portfólio + convite pra conversa.\nDispara após 2–3 tentativas sem resposta na ligação." },
       ],
     },
     {
       id: "st3", name: "Contato com Decisor", color: "#25D366",
       activities: [
-        { id: "c1", day: 1, channel: "ligacao", title: "Qualificação todo dia", script: "\"Você é o responsável pelas decisões da empresa? Ou tem alguém que eu possa falar sobre o marketing de vocês?\" — Confirmar nome, cargo e melhor horário.\nNão avança sem falar com quem decide." },
-        { id: "c2", day: 1, channel: "whatsapp", title: "Validação de dor após confirmar decisor", script: "Oi [nome]! Empresa sem site hoje é como ter uma loja sem placa — o cliente passa na frente e não sabe que vocês existem. Posso te mostrar o que fizemos pra empresas parecidas com a de vocês?" },
-        { id: "c3", day: 1, channel: "email", title: "Caso de sucesso se pedir mais info", script: "Envia exemplo de cliente similar com resultado concreto (ex: \"empresa de Sorriso que passou a receber contatos pelo Google após o site\")." },
+        { id: "c1", day: 1, time: "09:00", channel: "ligacao", title: "Qualificação — manhã", script: "\"Você é o responsável pelas decisões da empresa? Ou tem alguém que eu possa falar sobre o marketing de vocês?\" — Confirmar nome, cargo e melhor horário.\nNão avança sem falar com quem decide." },
+        { id: "c2", day: 1, time: "12:30", channel: "ligacao", title: "Qualificação — almoço", script: "Segunda tentativa do dia para falar com o decisor. Mesma abordagem." },
+        { id: "c3", day: 1, time: "10:00", channel: "whatsapp", title: "Validação de dor após confirmar decisor", script: "Oi [nome]! Empresa sem site hoje é como ter uma loja sem placa — o cliente passa na frente e não sabe que vocês existem. Posso te mostrar o que fizemos pra empresas parecidas com a de vocês?" },
+        { id: "c4", day: 2, time: "08:00", channel: "email", title: "Caso de sucesso se pedir mais info", script: "Envia exemplo de cliente similar com resultado concreto (ex: \"empresa de Sorriso que passou a receber contatos pelo Google após o site\")." },
       ],
     },
     {
       id: "st4", name: "Entrega de Material", color: "#F59E0B",
       activities: [
-        { id: "d1", day: 1, channel: "whatsapp", title: "Envio do material", script: "Oi [nome], segue o material que falamos! [link ou PDF] — qualquer dúvida é só chamar aqui.\nMaterial: portfólio + preços + o que está incluso." },
-        { id: "d2", day: 2, channel: "ligacao", title: "Follow-up pós-material", script: "\"Conseguiu ver o material? Teve alguma dúvida?\" — Reaquecer e empurrar pro agendamento da reunião." },
-        { id: "d3", day: 2, channel: "email", title: "Reforço do material se não abrir WhatsApp", script: "Reencaminha o material com assunto direto: \"Material sobre o site da [empresa] — veja quando puder\"." },
+        { id: "d1", day: 1, time: "09:00", channel: "whatsapp", title: "Envio do material", script: "Oi [nome], segue o material que falamos! [link ou PDF] — qualquer dúvida é só chamar aqui.\nMaterial: portfólio + preços + o que está incluso." },
+        { id: "d2", day: 2, time: "10:00", channel: "ligacao", title: "Follow-up pós-material", script: "\"Conseguiu ver o material? Teve alguma dúvida?\" — Reaquecer e empurrar pro agendamento da reunião." },
+        { id: "d3", day: 2, time: "08:00", channel: "email", title: "Reforço do material", script: "Reencaminha o material com assunto direto: \"Material sobre o site da [empresa] — veja quando puder\"." },
       ],
     },
     {
       id: "st5", name: "Reunião de apresentação", color: "#9333EA",
       activities: [
-        { id: "e1", day: 1, channel: "ligacao", title: "Agendamento confirmação", script: "\"Que tal uma call de 20 minutos essa semana? Mostro exatamente como ficaria o site de vocês.\" — Propõe 2 opções de horário." },
-        { id: "e2", day: 1, channel: "whatsapp", title: "Confirmação da reunião 1 dia antes", script: "Oi [nome], só confirmando nossa conversa amanhã às [hora]! Vai ser rápido e você já sai sabendo como o site de vocês vai ficar. Até lá! 🤝" },
-        { id: "e3", day: 1, channel: "email", title: "Convite da reunião formal", script: "Convite formal com link da call, data/hora e pauta de 3 tópicos: necessidades deles, proposta visual e próximos passos." },
+        { id: "e1", day: 1, time: "09:00", channel: "ligacao", title: "Agendamento — propor horários", script: "\"Que tal uma call de 20 minutos essa semana? Mostro exatamente como ficaria o site de vocês.\" — Propõe 2 opções de horário." },
+        { id: "e2", day: 1, time: "08:00", channel: "email", title: "Convite formal Google Meet", script: "Convite formal com link da call, data/hora e pauta de 3 tópicos: necessidades deles, proposta visual e próximos passos." },
+        { id: "e3", day: 1, time: "17:00", channel: "whatsapp", title: "Confirmação da reunião (1 dia antes)", script: "Oi [nome], só confirmando nossa conversa amanhã às [hora]! Vai ser rápido e você já sai sabendo como o site de vocês vai ficar. Até lá! 🤝" },
       ],
     },
   ],
@@ -926,7 +928,7 @@ function readWorkbookFile(file) {
 }
 
 const COMPANY_EXPORT_HEADERS = ["Nome", "Telefone", "Email", "Segmento", "Fluxo", "Etapa", "Status"];
-const ACTIVITY_EXPORT_HEADERS = ["Etapa", "Canal", "Dia", "Titulo", "Script"];
+const ACTIVITY_EXPORT_HEADERS = ["Etapa", "Canal", "Dia", "Horario", "Titulo", "Script"];
 
 function companiesToRows(companies, flows) {
   return companies.map(c => {
@@ -943,7 +945,7 @@ function activitiesToRows(flow) {
   const rows = [];
   for (const stage of flow.stages) {
     for (const act of stage.activities) {
-      rows.push({ Etapa: stage.name, Canal: CHANNELS[act.channel]?.label || act.channel, Dia: act.day, Titulo: act.title, Script: act.script });
+      rows.push({ Etapa: stage.name, Canal: CHANNELS[act.channel]?.label || act.channel, Dia: act.day, Horario: act.time || "", Titulo: act.title, Script: act.script });
     }
   }
   return rows;
@@ -961,11 +963,11 @@ function sampleCompanyRows() {
 
 function sampleActivityRows() {
   return [
-    { Etapa: "Confirmar Contato", Canal: "WhatsApp", Dia: 1, Titulo: "Abertura", Script: "Olá, bom dia! Tudo bem? 😊\nEsse número é da [Nome da Empresa]?" },
-    { Etapa: "Confirmar Contato", Canal: "E-mail", Dia: 1, Titulo: "Abertura", Script: "Assunto: Olá, tudo bem? — Nexsite\n\nOlá! Gostaria de confirmar: esse é o e-mail da [Nome da Empresa]?" },
-    { Etapa: "Confirmar Contato", Canal: "Ligação", Dia: 1, Titulo: "Confirmação", Script: "Oi, bom dia! Aqui é o Iuri, da Nexsite. Esse número é da [Nome da Empresa]?" },
-    { Etapa: "Confirmar Contato", Canal: "WhatsApp", Dia: 2, Titulo: "Follow-up", Script: "Oi, bom dia! Mandei mensagem ontem — só confirmando se é o contato certo da [Nome da Empresa]." },
-    { Etapa: "Chegar no Decisor", Canal: "Ligação", Dia: 1, Titulo: "Identificar decisor", Script: "Oi! Você é o responsável pela [Nome da Empresa]?" },
+    { Etapa: "Entrada de Leads", Canal: "WhatsApp", Dia: 1, Horario: "08:00", Titulo: "Primeira mensagem", Script: "Olá, aqui é a [empresa]? 👋" },
+    { Etapa: "Contato Realizado", Canal: "Ligação", Dia: 1, Horario: "09:00", Titulo: "Ligação manhã", Script: "Oi, vocês têm site? Muita empresa perde cliente por não aparecer no Google." },
+    { Etapa: "Contato Realizado", Canal: "Ligação", Dia: 1, Horario: "12:30", Titulo: "Ligação almoço", Script: "Segunda tentativa do dia. Mesma abordagem." },
+    { Etapa: "Contato Realizado", Canal: "E-mail", Dia: 3, Horario: "08:00", Titulo: "E-mail fallback", Script: "Assunto: Sua empresa aparece no Google?" },
+    { Etapa: "Reunião de apresentação", Canal: "WhatsApp", Dia: 1, Horario: "17:00", Titulo: "Confirmação reunião", Script: "Oi [nome], confirmando nossa conversa amanhã às [hora]! 🤝" },
   ];
 }
 
@@ -1252,9 +1254,10 @@ function ImportActivitiesConfig({ flows, saveFlows, onResult }) {
         const channelLabel = String(row.Canal || row.canal || "whatsapp").trim().toLowerCase();
         const channel = CHANNEL_BY_LABEL[channelLabel] || (CHANNELS[channelLabel] ? channelLabel : "whatsapp");
         const day = Number(row.Dia || row.dia || 1) || 1;
+        const time = String(row.Horario || row.horario || row.Horário || row.horário || "").trim();
         const script = String(row.Script || row.script || "");
 
-        stage.activities = [...stage.activities, { id: uid("act"), channel, day, title, script }];
+        stage.activities = [...stage.activities, { id: uid("act"), channel, day, time, title, script }];
         created++;
       }
 
@@ -2034,6 +2037,7 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
                     <span style={{ fontSize: 10, fontWeight: 800, color: "#334155", width: 32, flexShrink: 0 }}>D{act.day}</span>
                     <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
+                    {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#475569", background: "#141A2B", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>{act.time}</span>}
                     <button onClick={(e) => { e.stopPropagation(); deleteActivity(stage.id, act.id); }} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex" }}><X size={13} /></button>
                   </div>
                 );
@@ -2103,14 +2107,15 @@ function NewStageModal({ onClose, onCreate }) {
 function ActivityModal({ stageId, activity, onClose, onSave }) {
   const [channel, setChannel] = useState(activity?.channel || "whatsapp");
   const [day, setDay] = useState(activity?.day || 1);
+  const [time, setTime] = useState(activity?.time || "09:00");
   const [title, setTitle] = useState(activity?.title || "");
   const [script, setScript] = useState(activity?.script || "");
 
-  const canSave = title.trim() && day >= 1;
+  const canSave = title.trim() && day >= 1 && time.trim();
 
   const save = () => {
     if (!canSave) return;
-    onSave({ id: activity?.id || uid("act"), channel, day: Number(day), title: title.trim(), script });
+    onSave({ id: activity?.id || uid("act"), channel, day: Number(day), time: time.trim(), title: title.trim(), script });
   };
 
   return (
@@ -2133,8 +2138,21 @@ function ActivityModal({ stageId, activity, onClose, onSave }) {
         })}
       </div>
 
-      <FieldLabel>Dia da cadência (dia útil)</FieldLabel>
-      <input type="number" min={1} value={day} onChange={e => setDay(e.target.value)} style={{ ...inputStyle, width: 90 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Dia da cadência</FieldLabel>
+          <input type="number" min={1} value={day} onChange={e => setDay(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Horário <span style={{ color: "#F87171" }}>*</span></FieldLabel>
+          <input
+            type="time"
+            value={time}
+            onChange={e => setTime(e.target.value)}
+            style={{ ...inputStyle, width: "100%" }}
+          />
+        </div>
+      </div>
 
       <FieldLabel>Título da atividade</FieldLabel>
       <TextInput value={title} onChange={setTitle} placeholder="Ex: Abertura, Follow-up, Breakup…" />
