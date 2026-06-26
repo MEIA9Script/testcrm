@@ -995,7 +995,7 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
       const newCompanies = [];
 
       for (const row of rows) {
-        const name = String(row.Nome || row.nome || row.Name || "").trim();
+        const name = String(row.Nome || row.nome || row.Name || row["Nome da empresa"] || "").trim();
         if (!name) continue;
         if (existingNames.has(name.toLowerCase())) { skipped.push(name); continue; }
         existingNames.add(name.toLowerCase());
@@ -1004,7 +1004,7 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
           name,
           phone: String(row.Telefone || row.telefone || ""),
           email: String(row.Email || row.email || ""),
-          segment: String(row.Segmento || row.segmento || ""),
+          segment: String(row.Segmento || row.segmento || row.Nicho || row.nicho || ""),
           flowId: targetFlow || null,
           stageId: firstStageId || null,
           stageStartDate: todayISO(),
