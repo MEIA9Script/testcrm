@@ -199,6 +199,7 @@ export default function CRMApp() {
             companies={companies}
             lossReasons={lossReasons}
             saveCompanies={saveCompanies}
+            saveFlows={saveFlows}
             onBack={() => { setView("list"); setActiveCompanyId(null); }}
           />
         )}
@@ -518,10 +519,11 @@ function ActivityRow({ row, onOpenCompany, onMarkDone, onOpenDetail }) {
 
 // Drawer (painel lateral) com o detalhe de uma atividade — script completo,
 // marcar como feita, ir pra ficha da empresa, e navegar pra próxima/anterior atividade da lista.
-function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleDone, onOpenCompany, hideOpenCompany, onClose }) {
+function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleDone, onOpenCompany, hideOpenCompany, onClose, flows, saveFlows }) {
   const ch = CHANNELS[row.activity.channel];
   const Icon = ch.Icon;
   const status = row.done ? "done" : activityStatus(row);
+  const [editingActivity, setEditingActivity] = useState(false);
   const statusMeta = {
     overdue: { label: "Atrasada", color: "#F87171" },
     today: { label: "Hoje", color: "#FBBF24" },
@@ -529,17 +531,45 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
     done: { label: "Concluída", color: "#22C55E" },
   }[status];
 
+  const canEdit = !row.isExtra && flows && saveFlows;
+
+  const handleEditSave = async (updatedAct) => {
+    if (!canEdit) return;
+    const flow = flows.find(f => f.stages.some(s => s.id === row.stage.id));
+    if (!flow) return;
+    const updatedFlows = flows.map(f =>
+      f.id !== flow.id ? f : {
+        ...f,
+        stages: f.stages.map(s =>
+          s.id !== row.stage.id ? s : {
+            ...s,
+            activities: s.activities.map(a => a.id === updatedAct.id ? updatedAct : a),
+          }
+        ),
+      }
+    );
+    await saveFlows(updatedFlows);
+    setEditingActivity(false);
+  };
+
   return (
     <DrawerShell
       title={row.company.name}
       subtitle={`${row.stage.name}${row.isExtra ? "" : " · Dia " + row.activity.day}`}
       onClose={onClose}
       headerExtra={
-        !hideOpenCompany && (
-          <button onClick={onOpenCompany} title="Abrir ficha da empresa" style={{ background: "#0D1120", border: "1px solid #141A2B", borderRadius: 8, padding: "6px 10px", color: "#94A3B8", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-            <Building2 size={12} /> Ver ficha
-          </button>
-        )
+        <div style={{ display: "flex", gap: 6 }}>
+          {canEdit && (
+            <button onClick={() => setEditingActivity(true)} title="Editar atividade" style={{ background: "#0D1120", border: "1px solid #141A2B", borderRadius: 8, padding: "6px 10px", color: "#A78BFA", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+              <Edit3 size={12} /> Editar
+            </button>
+          )}
+          {!hideOpenCompany && (
+            <button onClick={onOpenCompany} title="Abrir ficha da empresa" style={{ background: "#0D1120", border: "1px solid #141A2B", borderRadius: 8, padding: "6px 10px", color: "#94A3B8", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+              <Building2 size={12} /> Ver ficha
+            </button>
+          )}
+        </div>
       }
       footer={
         <>
@@ -564,7 +594,10 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
         </div>
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, color: "#F1F5F9" }}>{row.activity.title}</div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: statusMeta.color }}>{statusMeta.label}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: statusMeta.color }}>{statusMeta.label}</div>
+            {row.activity.time && <span style={{ fontSize: 11, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "1px 7px" }}>{row.activity.time}</span>}
+          </div>
         </div>
       </div>
 
@@ -577,6 +610,15 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
         {row.company.phone && <InfoChip label="Telefone" value={row.company.phone} />}
         {row.company.email && <InfoChip label="E-mail" value={row.company.email} />}
       </div>
+
+      {editingActivity && (
+        <ActivityModal
+          stageId={row.stage.id}
+          activity={row.activity}
+          onClose={() => setEditingActivity(false)}
+          onSave={handleEditSave}
+        />
+      )}
     </DrawerShell>
   );
 }
@@ -1419,7 +1461,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
    COMPANY VIEW — detail with history + agenda
    ============================================================ */
 
-function CompanyView({ company, flows, companies, lossReasons, saveCompanies, onBack }) {
+function CompanyView({ company, flows, companies, lossReasons, saveCompanies, saveFlows, onBack }) {
   const [editing, setEditing] = useState(false);
   const [addingActivity, setAddingActivity] = useState(false);
   const [activeIdx, setActiveIdx] = useState(null);
@@ -1562,42 +1604,94 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, on
               <Plus size={11} /> Adicionar atividade
             </button>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {agenda.length === 0 && <div style={{ fontSize: 12, color: "#334155" }}>Nenhuma atividade ainda.</div>}
-            {agenda.map((item, i) => {
-              const ch = CHANNELS[item.activity.channel];
-              const Icon = ch.Icon;
-              const status = activityStatus(item);
-              return (
-                <div
-                  key={item.activity.id + i}
-                  onClick={() => setActiveIdx(i)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 9, cursor: "pointer",
-                    background: "#0D1120", border: "1px solid #141A2B", borderLeft: `3px solid ${item.done ? "#22C55E" : ch.color}`,
-                    borderRadius: 9, padding: "10px 12px", opacity: item.done ? 0.6 : 1,
-                  }}
-                >
-                  {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
-                  <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0", display: "flex", alignItems: "center", gap: 5 }}>
-                      {item.activity.title}
-                      {item.isExtra ? <span style={{ fontSize: 9, color: "#F472B6", background: "#F472B615", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>avulsa</span> : <span style={{ color: "#334155", fontWeight: 500 }}>· Dia {item.activity.day}</span>}
+            {(() => {
+              const days = [...new Set(agenda.filter(i => !i.isExtra).map(i => i.activity.day))];
+              const extras = agenda.filter(i => i.isExtra);
+              return [
+                ...days.map(day => {
+                  const items = agenda.filter(i => !i.isExtra && i.activity.day === day);
+                  return (
+                    <div key={`d${day}`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: "#1E3A5F", background: "#0D1E2F", border: "1px solid #1E293B", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>DIA {day}</span>
+                        <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
+                      </div>
+                      {items.sort((a, b) => (a.activity.time || "").localeCompare(b.activity.time || "")).map((item, i) => {
+                        const ch = CHANNELS[item.activity.channel];
+                        const Icon = ch.Icon;
+                        const status = activityStatus(item);
+                        const globalIdx = agenda.indexOf(item);
+                        return (
+                          <div
+                            key={item.activity.id + i}
+                            onClick={() => setActiveIdx(globalIdx)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 9, cursor: "pointer",
+                              background: "#0D1120", border: "1px solid #141A2B", borderLeft: `3px solid ${item.done ? "#22C55E" : ch.color}`,
+                              borderRadius: 9, padding: "10px 12px", opacity: item.done ? 0.6 : 1, marginBottom: 4,
+                            }}
+                          >
+                            {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
+                            <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
+                              <div style={{ fontSize: 10.5, color: status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : "#475569" }}>
+                                {item.done ? `Feito em ${new Date(item.doneAt).toLocaleDateString("pt-BR")}` : fmtDate(item.dueDate)}
+                              </div>
+                            </div>
+                            {item.activity.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{item.activity.time}</span>}
+                            <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div style={{ fontSize: 10.5, color: status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : "#475569" }}>
-                      {item.done ? `Feito em ${new Date(item.doneAt).toLocaleDateString("pt-BR")}` : fmtDate(item.dueDate)}
+                  );
+                }),
+                extras.length > 0 && (
+                  <div key="extras">
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: "#4A1D5F", background: "#1A0929", border: "1px solid #2D1040", borderRadius: 5, padding: "2px 8px", flexShrink: 0 }}>AVULSAS</span>
+                      <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
                     </div>
+                    {extras.map((item, i) => {
+                      const ch = CHANNELS[item.activity.channel];
+                      const Icon = ch.Icon;
+                      const status = activityStatus(item);
+                      const globalIdx = agenda.indexOf(item);
+                      return (
+                        <div
+                          key={item.activity.id + i}
+                          onClick={() => setActiveIdx(globalIdx)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 9, cursor: "pointer",
+                            background: "#0D1120", border: "1px solid #141A2B", borderLeft: `3px solid ${item.done ? "#22C55E" : ch.color}`,
+                            borderRadius: 9, padding: "10px 12px", opacity: item.done ? 0.6 : 1, marginBottom: 4,
+                          }}
+                        >
+                          {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
+                          <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0", display: "flex", alignItems: "center", gap: 5 }}>
+                              {item.activity.title}
+                              <span style={{ fontSize: 9, color: "#F472B6", background: "#F472B615", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>avulsa</span>
+                            </div>
+                            <div style={{ fontSize: 10.5, color: status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : "#475569" }}>
+                              {item.done ? `Feito em ${new Date(item.doneAt).toLocaleDateString("pt-BR")}` : fmtDate(item.dueDate)}
+                            </div>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); deleteExtraActivity(item.activity.id); }} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", flexShrink: 0 }}>
+                            <X size={13} />
+                          </button>
+                          <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
+                        </div>
+                      );
+                    })}
                   </div>
-                  {item.isExtra && (
-                    <button onClick={(e) => { e.stopPropagation(); deleteExtraActivity(item.activity.id); }} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", flexShrink: 0 }}>
-                      <X size={13} />
-                    </button>
-                  )}
-                  <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
-                </div>
-              );
-            })}
+                ),
+              ];
+            })()}
           </div>
         </div>
 
@@ -1649,6 +1743,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, on
           onOpenCompany={() => {}}
           hideOpenCompany
           onClose={() => setActiveIdx(null)}
+          flows={flows}
+          saveFlows={saveFlows}
         />
       )}
     </div>
