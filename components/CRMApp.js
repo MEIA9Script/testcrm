@@ -98,6 +98,41 @@ export default function CRMApp() {
   const [activeCompanyId, setActiveCompanyId] = useState(null);
   const [showNewCompany, setShowNewCompany] = useState(false);
 
+  useEffect(() => {
+    if (!loaded || flows.length === 0 || companies.length === 0) return;
+    let hasChanges = false;
+    const nextCompanies = companies.map(c => {
+      let flow = flows.find(f => f.id === c.flowId);
+      let newFlowId = c.flowId;
+      let newStageId = c.stageId;
+      let changed = false;
+
+      if (!flow) {
+        flow = flows[0];
+        newFlowId = flow.id;
+        changed = true;
+      }
+
+      if (flow && flow.stages.length > 0) {
+        const hasValidStage = flow.stages.some(s => s.id === newStageId);
+        if (!hasValidStage) {
+          newStageId = flow.stages[0].id;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        hasChanges = true;
+        return { ...c, flowId: newFlowId, stageId: newStageId, stageStartDate: c.stageStartDate || todayISO() };
+      }
+      return c;
+    });
+
+    if (hasChanges) {
+      saveCompanies(nextCompanies);
+    }
+  }, [loaded, flows, companies, saveCompanies]);
+
   if (!loaded) {
     return (
       <div style={{ background: "#07090F", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontFamily: "system-ui" }}>
@@ -592,13 +627,13 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
       </div>
 
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-        {[...flow.stages, ...(flowCompanies.some(c => !flow.stages.some(s => s.id === c.stageId)) ? [{ id: "orphan", name: "Sem etapa", color: "#64748B" }] : [])].map(stage => {
-          const stageCompanies = stage.id === "orphan" ? flowCompanies.filter(c => !flow.stages.some(s => s.id === c.stageId)) : flowCompanies.filter(c => c.stageId === stage.id);
+        {flow.stages.map(stage => {
+          const stageCompanies = flowCompanies.filter(c => c.stageId === stage.id);
           return (
             <div
               key={stage.id}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => { if (dragId && stage.id !== "orphan") moveCompany(dragId, stage.id); setDragId(null); }}
+              onDrop={() => { if (dragId) moveCompany(dragId, stage.id); setDragId(null); }}
               style={{ minWidth: 260, width: 260, flexShrink: 0, background: "#070A12", border: "1px solid #141A2B", borderRadius: 12, padding: 10, minHeight: 200 }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 6px 12px" }}>
