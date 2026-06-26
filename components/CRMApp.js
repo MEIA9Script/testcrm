@@ -146,7 +146,7 @@ export default function CRMApp() {
           <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={dealCompanies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
+          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
         )}
         {view === "config" && (
           <ConfigView
@@ -760,9 +760,9 @@ function StatCard({ label, value, sub, color, Icon }) {
    ============================================================ */
 
 function NegociosView({ companies, onOpenCompany }) {
-  const [filter, setFilter] = useState("all"); // all | ganho | perdido
-  const filtered = filter === "all" ? companies : companies.filter(c => c.status === filter);
-  const sorted = [...filtered].sort((a, b) => new Date(b.dealAt || 0) - new Date(a.dealAt || 0));
+  const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
+  const filtered = filter === "all" ? companies : filter === "criado" ? companies.filter(c => c.status !== "ganho" && c.status !== "perdido") : companies.filter(c => c.status === filter);
+  const sorted = [...filtered].sort((a, b) => new Date(b.dealAt || b.createdAt || 0) - new Date(a.dealAt || a.createdAt || 0));
 
   const totalGanho = companies.filter(c => c.status === "ganho").reduce((s, c) => s + (Number(c.dealValue) || 0), 0);
 
@@ -770,7 +770,7 @@ function NegociosView({ companies, onOpenCompany }) {
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", background: "#0D1120", border: "1px solid #141A2B", borderRadius: 9, padding: 3, gap: 2 }}>
-          {[["all", "Todos"], ["ganho", "🏆 Ganhos"], ["perdido", "❌ Perdidos"]].map(([k, l]) => (
+          {[["all", "Todos"], ["criado", "🆕 Criados"], ["ganho", "🏆 Ganhos"], ["perdido", "❌ Perdidos"]].map(([k, l]) => (
             <button key={k} onClick={() => setFilter(k)} style={{
               padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
               background: filter === k ? "#1E293B" : "transparent", color: filter === k ? "#F1F5F9" : "#64748B",
@@ -781,25 +781,39 @@ function NegociosView({ companies, onOpenCompany }) {
       </div>
 
       {sorted.length === 0 ? (
-        <EmptyState text="Nenhum negócio aqui ainda. Marque uma empresa como Ganho ou Perdido na ficha dela." />
+        <EmptyState text="Nenhum negócio aqui ainda." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {sorted.map(c => (
-            <div key={c.id} onClick={() => onOpenCompany(c.id)} style={{
-              display: "flex", alignItems: "center", gap: 12, background: "#0D1120", border: "1px solid #141A2B",
-              borderLeft: `3px solid ${c.status === "ganho" ? "#25D366" : "#F87171"}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer",
-            }}>
-              {c.status === "ganho" ? <Trophy size={17} color="#25D366" style={{ flexShrink: 0 }} /> : <ThumbsDown size={17} color="#F87171" style={{ flexShrink: 0 }} />}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#F1F5F9" }}>{c.name}</div>
-                <div style={{ fontSize: 11.5, color: "#64748B" }}>
-                  {c.status === "ganho" ? `Vendido por ${fmtBRL(c.dealValue)}` : (c.lossReason || "Sem motivo registrado")}
-                  {c.dealAt && ` · ${new Date(c.dealAt).toLocaleDateString("pt-BR")}`}
+          {sorted.map(c => {
+            const isGanho = c.status === "ganho";
+            const isPerdido = c.status === "perdido";
+            const isCriado = !isGanho && !isPerdido;
+            const borderColor = isGanho ? "#25D366" : isPerdido ? "#F87171" : "#38BDF8";
+            const badgeBg = isGanho ? "#25D36620" : isPerdido ? "#F8717120" : "#38BDF820";
+            const badgeColor = isGanho ? "#25D366" : isPerdido ? "#F87171" : "#38BDF8";
+            
+            return (
+              <div key={c.id} onClick={() => onOpenCompany(c.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, background: "#0D1120", border: "1px solid #141A2B",
+                borderLeft: `3px solid ${borderColor}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+              }}>
+                {isGanho ? <Trophy size={17} color="#25D366" style={{ flexShrink: 0 }} /> : isPerdido ? <ThumbsDown size={17} color="#F87171" style={{ flexShrink: 0 }} /> : <Building2 size={17} color="#38BDF8" style={{ flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#F1F5F9", display: "flex", alignItems: "center", gap: 8 }}>
+                    {c.name}
+                    <span style={{ padding: "3px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, background: badgeBg, color: badgeColor, textTransform: "uppercase" }}>
+                      {isGanho ? "Ganho" : isPerdido ? "Perdido" : "Criado"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#64748B", marginTop: 3 }}>
+                    {isGanho ? `Vendido por ${fmtBRL(c.dealValue)}` : isPerdido ? (c.lossReason || "Sem motivo registrado") : "No funil ativo"}
+                    {c.dealAt && ` · ${new Date(c.dealAt).toLocaleDateString("pt-BR")}`}
+                  </div>
                 </div>
+                <ChevronRight size={16} color="#334155" style={{ flexShrink: 0 }} />
               </div>
-              <ChevronRight size={16} color="#334155" style={{ flexShrink: 0 }} />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
