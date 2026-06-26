@@ -1812,11 +1812,9 @@ function FlowsView({ flows, saveFlows, companies }) {
         <button onClick={() => setShowNewFlow(true)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px", borderRadius: 9, border: "1px dashed #334155", background: "transparent", color: "#64748B", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
           <Plus size={13} /> Novo fluxo
         </button>
-        {flows.length === 0 && (
-          <button onClick={loadSample} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid #818CF840", background: "#818CF815", color: "#A5B4FC", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
-            <Sparkles size={13} /> Carregar fluxo de exemplo
-          </button>
-        )}
+        <button onClick={loadSample} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid #818CF840", background: "#818CF815", color: "#A5B4FC", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+          <Sparkles size={13} /> Carregar roteiro completo (Nexsite)
+        </button>
       </div>
 
       {flows.length === 0 && (
