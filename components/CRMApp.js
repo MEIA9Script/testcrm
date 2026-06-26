@@ -2028,21 +2028,43 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {stage.activities.sort((a, b) => a.day - b.day).map(act => {
-                const ch = CHANNELS[act.channel];
-                const Icon = ch.Icon;
-                return (
-                  <div key={act.id} onClick={() => setActivityModal({ stageId: stage.id, activity: act })} style={{ display: "flex", alignItems: "center", gap: 9, background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: "8px 10px", cursor: "pointer" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: "#334155", width: 32, flexShrink: 0 }}>D{act.day}</span>
-                    <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
-                    {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#475569", background: "#141A2B", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>{act.time}</span>}
-                    <button onClick={(e) => { e.stopPropagation(); deleteActivity(stage.id, act.id); }} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex" }}><X size={13} /></button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {(() => {
+                const sorted = [...stage.activities].sort((a, b) => a.day - b.day || (a.time || "").localeCompare(b.time || ""));
+                const days = [...new Set(sorted.map(a => a.day))];
+                return days.map(day => (
+                  <div key={day}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: "#1E3A5F", background: "#0D1E2F", border: "1px solid #1E293B", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>DIA {day}</span>
+                      <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {sorted.filter(a => a.day === day).map(act => {
+                        const ch = CHANNELS[act.channel];
+                        const Icon = ch.Icon;
+                        return (
+                          <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 9, background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: "8px 10px" }}>
+                            <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
+                            {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{act.time}</span>}
+                            <button
+                              onClick={() => setActivityModal({ stageId: stage.id, activity: act })}
+                              title="Editar atividade"
+                              style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", display: "flex", padding: 2 }}
+                            ><Edit3 size={12} /></button>
+                            <button
+                              onClick={() => deleteActivity(stage.id, act.id)}
+                              title="Excluir atividade"
+                              style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", padding: 2 }}
+                            ><X size={12} /></button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                );
-              })}
-              <button onClick={() => setActivityModal({ stageId: stage.id })} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "8px", borderRadius: 8, border: "1px dashed #334155", background: "transparent", color: "#475569", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 3 }}>
+                ));
+              })()}
+              <button onClick={() => setActivityModal({ stageId: stage.id })} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "8px", borderRadius: 8, border: "1px dashed #334155", background: "transparent", color: "#475569", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
                 <Plus size={12} /> Adicionar atividade
               </button>
             </div>
