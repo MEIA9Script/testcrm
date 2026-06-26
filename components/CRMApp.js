@@ -146,7 +146,7 @@ export default function CRMApp() {
           <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
+          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
         )}
         {view === "config" && (
           <ConfigView
@@ -592,13 +592,13 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
       </div>
 
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-        {flow.stages.map(stage => {
-          const stageCompanies = flowCompanies.filter(c => c.stageId === stage.id);
+        {[...flow.stages, ...(flowCompanies.some(c => !flow.stages.some(s => s.id === c.stageId)) ? [{ id: "orphan", name: "Sem etapa", color: "#64748B" }] : [])].map(stage => {
+          const stageCompanies = stage.id === "orphan" ? flowCompanies.filter(c => !flow.stages.some(s => s.id === c.stageId)) : flowCompanies.filter(c => c.stageId === stage.id);
           return (
             <div
               key={stage.id}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => { if (dragId) moveCompany(dragId, stage.id); setDragId(null); }}
+              onDrop={() => { if (dragId && stage.id !== "orphan") moveCompany(dragId, stage.id); setDragId(null); }}
               style={{ minWidth: 260, width: 260, flexShrink: 0, background: "#070A12", border: "1px solid #141A2B", borderRadius: 12, padding: 10, minHeight: 200 }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 6px 12px" }}>
@@ -759,31 +759,66 @@ function StatCard({ label, value, sub, color, Icon }) {
    NEGÓCIOS VIEW — won/lost companies, separate from pipeline
    ============================================================ */
 
-function NegociosView({ companies, onOpenCompany }) {
+function NegociosView({ companies, onOpenCompany, saveCompanies }) {
   const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  
   const filtered = filter === "all" ? companies : filter === "criado" ? companies.filter(c => c.status !== "ganho" && c.status !== "perdido") : companies.filter(c => c.status === filter);
   const sorted = [...filtered].sort((a, b) => new Date(b.dealAt || b.createdAt || 0) - new Date(a.dealAt || a.createdAt || 0));
 
   const totalGanho = companies.filter(c => c.status === "ganho").reduce((s, c) => s + (Number(c.dealValue) || 0), 0);
+
+  const toggleSelect = (id, e) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+  
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sorted.length && sorted.length > 0) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sorted.map(c => c.id)));
+  };
+
+  const deleteSelected = async () => {
+    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} empresa(s)?`)) return;
+    const next = companies.filter(c => !selectedIds.has(c.id));
+    await saveCompanies(next);
+    setSelectedIds(new Set());
+  };
 
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", background: "#0D1120", border: "1px solid #141A2B", borderRadius: 9, padding: 3, gap: 2 }}>
           {[["all", "Todos"], ["criado", "🆕 Criados"], ["ganho", "🏆 Ganhos"], ["perdido", "❌ Perdidos"]].map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} style={{
+            <button key={k} onClick={() => { setFilter(k); setSelectedIds(new Set()); }} style={{
               padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
               background: filter === k ? "#1E293B" : "transparent", color: filter === k ? "#F1F5F9" : "#64748B",
             }}>{l}</button>
           ))}
         </div>
-        <div style={{ fontSize: 12.5, color: "#25D366", fontWeight: 800 }}>Total ganho: {fmtBRL(totalGanho)}</div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ fontSize: 12.5, color: "#25D366", fontWeight: 800 }}>Total ganho: {fmtBRL(totalGanho)}</div>
+          {selectedIds.size > 0 && (
+            <button onClick={deleteSelected} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 6, border: "1px solid #F8717140", background: "#F8717115", color: "#FCA5A5", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              <Trash2 size={13} /> Excluir ({selectedIds.size})
+            </button>
+          )}
+        </div>
       </div>
 
       {sorted.length === 0 ? (
         <EmptyState text="Nenhum negócio aqui ainda." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "0 14px", marginBottom: 4 }}>
+            <button onClick={toggleSelectAll} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6, color: "#64748B", fontSize: 11, fontWeight: 700 }}>
+              {selectedIds.size === sorted.length && sorted.length > 0 ? <CheckCircle2 size={16} color="#38BDF8" /> : <Circle size={16} />}
+              Selecionar todos
+            </button>
+          </div>
           {sorted.map(c => {
             const isGanho = c.status === "ganho";
             const isPerdido = c.status === "perdido";
@@ -791,12 +826,16 @@ function NegociosView({ companies, onOpenCompany }) {
             const borderColor = isGanho ? "#25D366" : isPerdido ? "#F87171" : "#38BDF8";
             const badgeBg = isGanho ? "#25D36620" : isPerdido ? "#F8717120" : "#38BDF820";
             const badgeColor = isGanho ? "#25D366" : isPerdido ? "#F87171" : "#38BDF8";
+            const isSelected = selectedIds.has(c.id);
             
             return (
               <div key={c.id} onClick={() => onOpenCompany(c.id)} style={{
-                display: "flex", alignItems: "center", gap: 12, background: "#0D1120", border: "1px solid #141A2B",
+                display: "flex", alignItems: "center", gap: 12, background: isSelected ? "#1E293B" : "#0D1120", border: "1px solid #141A2B",
                 borderLeft: `3px solid ${borderColor}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer",
               }}>
+                <button onClick={(e) => toggleSelect(c.id, e)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", flexShrink: 0 }}>
+                  {isSelected ? <CheckCircle2 size={18} color="#38BDF8" /> : <Circle size={18} color="#475569" />}
+                </button>
                 {isGanho ? <Trophy size={17} color="#25D366" style={{ flexShrink: 0 }} /> : isPerdido ? <ThumbsDown size={17} color="#F87171" style={{ flexShrink: 0 }} /> : <Building2 size={17} color="#38BDF8" style={{ flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.5, color: "#F1F5F9", display: "flex", alignItems: "center", gap: 8 }}>
