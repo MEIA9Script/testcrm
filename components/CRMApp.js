@@ -1156,12 +1156,35 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
         </div>
       ) : (
         <>
+          <div style={{ background: "#070A12", border: "1px solid #1E293B", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#64748B", marginBottom: 8, fontWeight: 700 }}>EXEMPLO DE COMO A PLANILHA DEVE SER:</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 10.5, textAlign: "left", borderCollapse: "collapse", color: "#CBD5E1", minWidth: 400 }}>
+                <thead>
+                  <tr style={{ color: "#94A3B8" }}>
+                    <th style={{ paddingBottom: 6 }}>Nome da empresa</th>
+                    <th style={{ paddingBottom: 6 }}>Telefone</th>
+                    <th style={{ paddingBottom: 6 }}>Email</th>
+                    <th style={{ paddingBottom: 6 }}>Segmento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderTop: "1px solid #1E293B" }}>
+                    <td style={{ padding: "6px 0", color: "#F1F5F9" }}>Pizzaria do Bairro</td>
+                    <td style={{ padding: "6px 0" }}>11999990002</td>
+                    <td style={{ padding: "6px 0" }}>contato@pizzaria.com</td>
+                    <td style={{ padding: "6px 0", color: "#64748B" }}>Restaurante</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
           <FieldLabel>Fluxo de destino</FieldLabel>
           <select value={targetFlow} onChange={e => setTargetFlow(e.target.value)} style={{ ...selectStyle, marginBottom: 12 }}>
             {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
-          <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 9, border: "1px solid #38BDF840", background: "#38BDF815", color: "#7DD3FC", fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer" }}>
+          <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 9, border: "1px solid #38BDF840", background: "#38BDF815", color: "#7DD3FC", fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer", width: "fit-content" }}>
             <Upload size={13} /> {busy ? "Lendo arquivo…" : "Escolher arquivo (.csv ou .xlsx)"}
           </button>
         </>
@@ -1251,12 +1274,37 @@ function ImportActivitiesConfig({ flows, saveFlows, onResult }) {
         <div style={{ fontSize: 12, color: "#F87171" }}>Crie um fluxo primeiro na aba “Fluxos” pra poder importar.</div>
       ) : (
         <>
+          <div style={{ background: "#070A12", border: "1px solid #1E293B", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#64748B", marginBottom: 8, fontWeight: 700 }}>EXEMPLO DE COMO A PLANILHA DEVE SER:</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 10.5, textAlign: "left", borderCollapse: "collapse", color: "#CBD5E1", minWidth: 400 }}>
+                <thead>
+                  <tr style={{ color: "#94A3B8" }}>
+                    <th style={{ paddingBottom: 6 }}>Etapa</th>
+                    <th style={{ paddingBottom: 6 }}>Canal</th>
+                    <th style={{ paddingBottom: 6 }}>Dia</th>
+                    <th style={{ paddingBottom: 6 }}>Titulo</th>
+                    <th style={{ paddingBottom: 6 }}>Script</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderTop: "1px solid #1E293B" }}>
+                    <td style={{ padding: "6px 0", color: "#F1F5F9" }}>Entrada de Leads</td>
+                    <td style={{ padding: "6px 0" }}>whatsapp</td>
+                    <td style={{ padding: "6px 0" }}>1</td>
+                    <td style={{ padding: "6px 0" }}>Abertura</td>
+                    <td style={{ padding: "6px 0", color: "#64748B" }}>"Olá, tudo bem?..."</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
           <FieldLabel>Fluxo de destino</FieldLabel>
           <select value={targetFlow} onChange={e => setTargetFlow(e.target.value)} style={{ ...selectStyle, marginBottom: 12 }}>
             {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
-          <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 9, border: "1px solid #FB923C40", background: "#FB923C15", color: "#FDBA74", fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer" }}>
+          <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 9, border: "1px solid #FB923C40", background: "#FB923C15", color: "#FDBA74", fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer", width: "fit-content" }}>
             <Upload size={13} /> {busy ? "Importando…" : "Escolher arquivo (.csv ou .xlsx)"}
           </button>
         </>
