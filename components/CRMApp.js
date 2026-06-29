@@ -6,7 +6,7 @@ import {
   LayoutGrid, List, Settings, ArrowLeft, Check, Clock, Building2,
   Trash2, Edit3, GripVertical, CheckCircle2, Circle, AlertCircle,
   Sparkles, Search, Trophy, ThumbsDown, Upload, Download, FileSpreadsheet,
-  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut
+  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useCRMData } from "../lib/useCRMData";
@@ -287,7 +287,7 @@ function TopBar({ view, setView, onNewCompany, companyCount, onLogout }) {
     { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
     { key: "list", label: "Atividades", Icon: List },
     { key: "kanban", label: "Kanban", Icon: LayoutGrid },
-    { key: "flows", label: "Fluxos", Icon: Settings },
+    { key: "flows", label: "Automações", Icon: Zap },
     { key: "negocios", label: "Negócios", Icon: Briefcase },
     { key: "config", label: "Config", Icon: FileSpreadsheet },
   ];
@@ -692,7 +692,7 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
   const [dragId, setDragId] = useState(null);
 
   if (flows.length === 0) {
-    return <EmptyState text="Nenhum fluxo criado ainda. Vá em “Fluxos” pra criar o primeiro." />;
+    return <EmptyState text="Nenhuma automação criada ainda. Vá na aba 'Automações' para criar a primeira." />;
   }
 
   const flow = flows.find(f => f.id === flowFilter) || flows[0];
@@ -1392,7 +1392,7 @@ function ImportActivitiesConfig({ flows, saveFlows, onResult }) {
   return (
     <ConfigCard icon={Upload} color="#FB923C" title="Importar atividades" description="Envie um .csv ou .xlsx com as colunas Etapa, Canal, Dia, Titulo, Script. Etapas que não existem no fluxo são criadas automaticamente.">
       {flows.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#F87171" }}>Crie um fluxo primeiro na aba “Fluxos” pra poder importar.</div>
+        <div style={{ fontSize: 12, color: "#F87171" }}>Crie uma automação primeiro na aba “Automações” para poder importar.</div>
       ) : (
         <>
           <div style={{ background: "#070A12", border: "1px solid #1E293B", borderRadius: 8, padding: 12, marginBottom: 16 }}>
@@ -1516,7 +1516,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
       <FieldLabel>Fluxo</FieldLabel>
       {flows.length === 0 ? (
         <div style={{ fontSize: 12, color: "#F87171", background: "#7C2D1220", border: "1px solid #7C2D1240", borderRadius: 8, padding: "8px 10px" }}>
-          Crie um fluxo primeiro na aba "Fluxos".
+          Crie uma automação primeiro na aba "Automações".
         </div>
       ) : (
         <select value={flowId} onChange={e => setFlowId(e.target.value)} style={selectStyle}>
