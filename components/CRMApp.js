@@ -235,7 +235,7 @@ export default function CRMApp() {
           <KanbanView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
         )}
         {view === "flows" && (
-          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} />
+          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={saveCompanies} />
         )}
         {view === "negocios" && (
           <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
@@ -2061,13 +2061,150 @@ function EditCompanyModal({ company, flows, onClose, onSave }) {
   );
 }
 
+function BulkActivityModal({ onClose, onSave, companies, flows }) {
+  const [channel, setChannel] = useState("whatsapp");
+  const [title, setTitle] = useState("");
+  const [script, setScript] = useState("");
+  const [date, setDate] = useState(todayISO());
+  const [time, setTime] = useState("09:00");
+  const [selectedIds, setSelectedIds] = useState([]);
+  
+  const [flowFilter, setFlowFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
+
+  // Get active flow to determine available stages
+  const activeFlow = flowFilter ? flows.find(f => f.id === flowFilter) : null;
+
+  // Filter companies based on selections
+  const filteredCompanies = useMemo(() => {
+    let list = companies;
+    if (flowFilter) list = list.filter(c => c.flowId === flowFilter);
+    if (stageFilter) list = list.filter(c => c.stageId === stageFilter);
+    return list;
+  }, [companies, flowFilter, stageFilter]);
+
+  const toggleSelection = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  
+  const selectAll = () => {
+    if (selectedIds.length === filteredCompanies.length) {
+      setSelectedIds([]); // deselect all
+    } else {
+      setSelectedIds(filteredCompanies.map(c => c.id));
+    }
+  };
+
+  const canSave = title.trim() && date && time && selectedIds.length > 0;
+
+  const save = () => {
+    if (!canSave) return;
+    onSave({ channel, title: title.trim(), script, dueDate: date, time }, selectedIds);
+  };
+
+  return (
+    <ModalShell onClose={onClose} title="Atribuição de Atividade em Massa">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div>
+          <FieldLabel>Filtro de Funil</FieldLabel>
+          <select value={flowFilter} onChange={e => { setFlowFilter(e.target.value); setStageFilter(""); }} style={selectStyle}>
+            <option value="">Todas as Automações (Qualquer funil)</option>
+            {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Filtro de Etapa</FieldLabel>
+          <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} style={selectStyle} disabled={!activeFlow}>
+            <option value="">Todas as Etapas</option>
+            {activeFlow?.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: 10, marginBottom: 16, maxHeight: 180, overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #141A2B", marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700 }}>{filteredCompanies.length} Leads filtrados</span>
+          <button onClick={selectAll} style={{ background: "none", border: "none", color: "#38BDF8", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>
+            {selectedIds.length === filteredCompanies.length && filteredCompanies.length > 0 ? "Desmarcar todos" : "Marcar todos"}
+          </button>
+        </div>
+        {filteredCompanies.length === 0 && <div style={{ fontSize: 11, color: "#64748B", textAlign: "center", padding: 10 }}>Nenhum lead encontrado com esses filtros.</div>}
+        {filteredCompanies.map(c => (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+            <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleSelection(c.id)} style={{ cursor: "pointer" }} />
+            <span style={{ fontSize: 12, color: "#E2E8F0" }}>{c.name}</span>
+          </div>
+        ))}
+      </div>
+
+      <FieldLabel>Canal da Atividade</FieldLabel>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {Object.entries(CHANNELS).map(([key, ch]) => {
+          const Icon = ch.Icon;
+          const active = channel === key;
+          return (
+            <button key={key} onClick={() => setChannel(key)} style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "9px 6px",
+              borderRadius: 9, border: `1px solid ${active ? ch.color + "70" : "#141A2B"}`, background: active ? ch.color + "15" : "#070A12",
+              cursor: "pointer",
+            }}>
+              <Icon size={15} color={active ? ch.color : "#475569"} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: active ? ch.color : "#475569" }}>{ch.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Data</FieldLabel>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Horário</FieldLabel>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+
+      <FieldLabel>Título da Atividade</FieldLabel>
+      <TextInput value={title} onChange={setTitle} placeholder="Ex: Ligação de boas-vindas" />
+      
+      <FieldLabel>Script / Notas (opcional)</FieldLabel>
+      <textarea
+        value={script}
+        onChange={e => setScript(e.target.value)}
+        rows={3}
+        style={{ ...inputStyle, resize: "vertical" }}
+        placeholder="Instruções para executar a atividade..."
+      />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+        <button
+          onClick={save}
+          disabled={!canSave}
+          style={{ flex: 1, padding: "11px", borderRadius: 9, border: "none", background: canSave ? "linear-gradient(135deg, #6366F1, #38BDF8)" : "#1E293B", color: canSave ? "#fff" : "#475569", fontWeight: 800, fontSize: 13.5, cursor: canSave ? "pointer" : "not-allowed" }}
+        >
+          {canSave ? `Criar para ${selectedIds.length} lead(s)` : "Preencha os dados"}
+        </button>
+        <button
+          onClick={onClose}
+          style={{ flex: 1, padding: "11px", borderRadius: 9, border: "1px solid #1E293B", background: "transparent", color: "#94A3B8", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
 /* ============================================================
    FLOWS VIEW — create/edit flows + stages + activities
    ============================================================ */
 
-function FlowsView({ flows, saveFlows, companies }) {
+function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
   const [activeFlowId, setActiveFlowId] = useState(flows[0]?.id || null);
   const [showNewFlow, setShowNewFlow] = useState(false);
+  const [showBulkActivity, setShowBulkActivity] = useState(false);
 
   const activeFlow = flows.find(f => f.id === activeFlowId);
 
@@ -2105,8 +2242,29 @@ function FlowsView({ flows, saveFlows, companies }) {
     await saveFlows(flows.map(f => f.id === activeFlow.id ? { ...f, ...patch } : f));
   };
 
+  const handleBulkActivitySave = async (activityData, companyIds) => {
+    const nextCompanies = companies.map(c => {
+      if (companyIds.includes(c.id)) {
+        return {
+          ...c,
+          extraActivities: [...(c.extraActivities || []), { ...activityData, id: uid("ext") }]
+        };
+      }
+      return c;
+    });
+    await saveCompanies(nextCompanies);
+    setShowBulkActivity(false);
+  };
+
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#E2E8F0" }}>⚡ Central de Automações</h2>
+        <button onClick={() => setShowBulkActivity(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 9, border: "none", background: "linear-gradient(135deg, #25C99E, #38BDF8)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 10px rgba(56, 189, 248, 0.3)" }}>
+          <Zap size={14} /> Criar Atividade em Lote
+        </button>
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
         {flows.map(f => (
           <button key={f.id} onClick={() => setActiveFlowId(f.id)} style={{
@@ -2131,8 +2289,14 @@ function FlowsView({ flows, saveFlows, companies }) {
         <FlowEditor flow={activeFlow} onUpdate={updateFlow} onDelete={() => deleteFlow(activeFlow.id)} />
       )}
 
-      {showNewFlow && (
-        <NewFlowModal onClose={() => setShowNewFlow(false)} onCreate={createFlow} />
+      {showNewFlow && <NewFlowModal onClose={() => setShowNewFlow(false)} onCreate={createFlow} />}
+      {showBulkActivity && (
+        <BulkActivityModal 
+          onClose={() => setShowBulkActivity(false)} 
+          onSave={handleBulkActivitySave} 
+          companies={companies} 
+          flows={flows} 
+        />
       )}
     </div>
   );
