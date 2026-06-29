@@ -353,7 +353,7 @@ function computeCompanyAgenda(company, flows) {
     const stageIdx = flow.stages.findIndex(s => s.id === company.stageId);
     if (stageIdx !== -1) {
       const stage = flow.stages[stageIdx];
-      const stageStart = company.stageStartDate ? new Date(company.stageStartDate) : new Date();
+      const stageStart = company.stageStartDate ? new Date(company.stageStartDate + "T12:00:00") : new Date();
       for (const act of stage.activities) {
         const dueDate = addBusinessDays(stageStart, act.day - 1);
         const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
@@ -373,7 +373,7 @@ function computeCompanyAgenda(company, flows) {
   // Atividades avulsas adicionadas manualmente na ficha da empresa
   const extraStage = { id: "extra", name: "Atividade avulsa", color: "#F472B6" };
   for (const act of (company.extraActivities || [])) {
-    const dueDate = act.dueDate ? new Date(act.dueDate) : new Date();
+    const dueDate = act.dueDate ? new Date(act.dueDate + "T12:00:00") : new Date();
     const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === "extra");
     items.push({
       activity: act,
@@ -1711,13 +1711,13 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 22 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <SectionTitle>📋 Atividades</SectionTitle>
-            <button onClick={() => setAddingActivity(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px dashed #334155", borderRadius: 7, padding: "5px 9px", color: "#64748B", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-              <Plus size={11} /> Adicionar atividade
+            <SectionTitle>📋 Atividades & Automações</SectionTitle>
+            <button onClick={() => setAddingActivity(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "linear-gradient(135deg, #6366F1, #38BDF8)", border: "none", borderRadius: 7, padding: "6px 12px", color: "#fff", fontSize: 11.5, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 10px rgba(56, 189, 248, 0.3)" }}>
+              <Plus size={12} /> Agendar Atividade
             </button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {agenda.length === 0 && <div style={{ fontSize: 12, color: "#334155" }}>Nenhuma atividade ainda.</div>}
+            {agenda.length === 0 && <div style={{ fontSize: 12, color: "#334155" }}>Nenhuma atividade agendada.</div>}
             {(() => {
               const days = [...new Set(agenda.filter(i => !i.isExtra).map(i => i.activity.day))];
               const extras = agenda.filter(i => i.isExtra);
@@ -1744,26 +1744,26 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                               background: "#0D1120", border: "1px solid #141A2B", borderLeft: `3px solid ${item.done ? "#22C55E" : ch.color}`,
                               borderRadius: 9, padding: "10px 12px", opacity: item.done ? 0.6 : 1, marginBottom: 4,
                             }}
-                          >
-                            {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
-                            <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
-                              <div style={{ fontSize: 10.5, color: statusColor }}>
-                                {fmtDueDateTime(item)}
+                            >
+                              {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
+                              <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
+                                <div style={{ fontSize: 10.5, color: statusColor }}>
+                                  {fmtDueDateTime(item)}
+                                </div>
                               </div>
+                              <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
                             </div>
-                            <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                }),
+                          );
+                        })}
+                      </div>
+                    );
+                  }),
                 extras.length > 0 && (
                   <div key="extras">
                     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: "#4A1D5F", background: "#1A0929", border: "1px solid #2D1040", borderRadius: 5, padding: "2px 8px", flexShrink: 0 }}>AVULSAS</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: "#F472B6", background: "#381729", border: "1px solid #831843", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>MANUAL</span>
                       <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
                     </div>
                     {extras.map((item, i) => {
@@ -1901,7 +1901,7 @@ function AdvanceStageModal({ nextStageName, onClose, onConfirm }) {
   );
 }
 
-// Modal simples pra adicionar uma atividade avulsa (fora do fluxo) direto na ficha da empresa.
+// Modal simples pra adicionar uma atividade manualmente (estilo Pipedrive) na ficha da empresa.
 function ExtraActivityModal({ onClose, onSave }) {
   const [channel, setChannel] = useState("whatsapp");
   const [title, setTitle] = useState("");
@@ -1917,7 +1917,7 @@ function ExtraActivityModal({ onClose, onSave }) {
   };
 
   return (
-    <ModalShell onClose={onClose} title="Nova atividade avulsa">
+    <ModalShell onClose={onClose} title="Agendar Nova Atividade">
       <FieldLabel>Canal</FieldLabel>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
         {Object.entries(CHANNELS).map(([key, ch]) => {
@@ -2346,8 +2346,8 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
                   );
                 });
               })()}
-              <button onClick={() => setActivityModal({ stageId: stage.id })} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "8px", borderRadius: 8, border: "1px dashed #334155", background: "transparent", color: "#475569", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
-                <Plus size={12} /> Adicionar atividade
+              <button onClick={() => setActivityModal({ stageId: stage.id })} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "8px", borderRadius: 8, border: "1px dashed #6366F1", background: "transparent", color: "#818CF8", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
+                <Plus size={12} /> Criar automação nesta etapa
               </button>
             </div>
           </div>
