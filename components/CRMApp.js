@@ -122,7 +122,7 @@ function getNextPendingActivity(company, flows) {
    ROOT APP
    ============================================================ */
 
-export default function CRMApp() {
+export default function CRMApp({ initialView = "dashboard" }) {
   const router = useRouter();
   const { companies, flows, lossReasons, loaded, error, saveCompanies, saveFlows, saveLossReasons, setError } = useCRMData();
   const handleLogout = async () => {
@@ -131,7 +131,16 @@ export default function CRMApp() {
     router.push("/login");
     router.refresh();
   };
-  const [view, setView] = useState("dashboard"); // dashboard | list | kanban | flows | negocios | config | company
+  const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
+  
+  // Atualiza a URL automaticamente sem recarregar a página toda vez que trocar de aba
+  useEffect(() => {
+    // Evita loop infinito ou sobrescrever rota de login, etc.
+    if (view && typeof window !== "undefined") {
+      window.history.pushState(null, '', '/' + view);
+    }
+  }, [view]);
+
   const [activeCompanyId, setActiveCompanyId] = useState(null);
   const [showNewCompany, setShowNewCompany] = useState(false);
 
