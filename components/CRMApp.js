@@ -2210,6 +2210,14 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
   const [nameInput, setNameInput] = useState(flow.name);
   const [activityModal, setActivityModal] = useState(null); // { stageId, activity? }
   const [stageModal, setStageModal] = useState(false);
+  const [previewDate, setPreviewDate] = useState(todayISO()); // data de referência para visualizar datas reais
+
+  // Calcula a data real de um dia da cadência
+  const calcDayDate = (day) => {
+    if (!previewDate) return null;
+    const base = new Date(previewDate + "T12:00:00");
+    return addBusinessDays(base, day - 1);
+  };
 
   const addStage = async (name) => {
     const color = STAGE_COLORS[flow.stages.length % STAGE_COLORS.length];
@@ -2265,9 +2273,20 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
             <button onClick={() => setRenaming(true)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", display: "flex" }}><Edit3 size={14} /></button>
           </div>
         )}
-        <button onClick={onDelete} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #7C2D1240", borderRadius: 8, padding: "6px 11px", color: "#F87171", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-          <Trash2 size={12} /> Excluir fluxo
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#0D1120", border: "1px solid #1E293B", borderRadius: 9, padding: "6px 10px" }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#475569", whiteSpace: "nowrap" }}>Dia 1 =</span>
+            <input
+              type="date"
+              value={previewDate}
+              onChange={e => setPreviewDate(e.target.value)}
+              style={{ background: "transparent", border: "none", color: "#38BDF8", fontSize: 12, fontWeight: 700, outline: "none", cursor: "pointer" }}
+            />
+          </div>
+          <button onClick={onDelete} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #7C2D1240", borderRadius: 8, padding: "6px 11px", color: "#F87171", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+            <Trash2 size={12} /> Excluir fluxo
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -2287,10 +2306,16 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
               {(() => {
                 const sorted = [...stage.activities].sort((a, b) => a.day - b.day || (a.time || "").localeCompare(b.time || ""));
                 const days = [...new Set(sorted.map(a => a.day))];
-                return days.map(day => (
+                return days.map(day => {
+                  const realDate = calcDayDate(day);
+                  const realDateStr = realDate ? realDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : null;
+                  return (
                   <div key={day}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: "#1E3A5F", background: "#0D1E2F", border: "1px solid #1E293B", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>DIA {day}</span>
+                      {realDateStr && (
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8" }}>{realDateStr}</span>
+                      )}
                       <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2318,7 +2343,8 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
                       })}
                     </div>
                   </div>
-                ));
+                  );
+                });
               })()}
               <button onClick={() => setActivityModal({ stageId: stage.id })} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "8px", borderRadius: 8, border: "1px dashed #334155", background: "transparent", color: "#475569", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
                 <Plus size={12} /> Adicionar atividade
