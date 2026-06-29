@@ -84,6 +84,40 @@ const SAMPLE_FLOW = {
 const uid = (p = "id") => `${p}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+const defaultActivityTime = (channel) => {
+  if (channel === "ligacao") return "09:00";
+  if (channel === "whatsapp") return "08:00";
+  if (channel === "email") return "09:00";
+  return "09:00";
+};
+
+function fmtDueDateTime(item) {
+  if (item.done) {
+    if (!item.doneAt) return "Concluída";
+    const d = new Date(item.doneAt);
+    const dateStr = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return `Concluída em ${dateStr} às ${timeStr}`;
+  }
+  
+  const status = activityStatus(item);
+  const dateStr = fmtDate(item.dueDate);
+  const timeStr = item.activity.time || "09:00";
+  
+  if (status === "today") {
+    return `Hoje às ${timeStr}`;
+  }
+  if (status === "overdue") {
+    return `Atrasada (${dateStr} às ${timeStr})`;
+  }
+  return `${dateStr} às ${timeStr}`;
+}
+
+function getNextPendingActivity(company, flows) {
+  const agenda = computeCompanyAgenda(company, flows);
+  return agenda.find(item => !item.done);
+}
+
 /* ============================================================
    ROOT APP
    ============================================================ */
@@ -135,6 +169,26 @@ export default function CRMApp() {
       saveCompanies(nextCompanies);
     }
   }, [loaded, flows, companies, saveCompanies]);
+
+  // Normaliza atividades sem horário — aplica o default por canal e salva
+  useEffect(() => {
+    if (!loaded || flows.length === 0) return;
+    let hasChanges = false;
+    const nextFlows = flows.map(flow => ({
+      ...flow,
+      stages: flow.stages.map(stage => ({
+        ...stage,
+        activities: stage.activities.map(act => {
+          if (!act.time) {
+            hasChanges = true;
+            return { ...act, time: defaultActivityTime(act.channel) };
+          }
+          return act;
+        }),
+      })),
+    }));
+    if (hasChanges) saveFlows(nextFlows);
+  }, [loaded, flows, saveFlows]);
 
   if (!loaded) {
     return (
@@ -470,12 +524,9 @@ function ActivityRow({ row, onOpenCompany, onMarkDone, onOpenDetail }) {
   const ch = CHANNELS[row.activity.channel];
   const Icon = ch.Icon;
   const status = row.done ? "done" : activityStatus(row);
-  const statusMeta = {
-    overdue: { label: "Atrasada", color: "#F87171" },
-    today: { label: "Hoje", color: "#FBBF24" },
-    upcoming: { label: fmtDate(row.dueDate), color: "#475569" },
-    done: { label: "Concluída", color: "#22C55E" },
-  }[status];
+  
+  const color = status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : status === "done" ? "#22C55E" : "#64748B";
+  const label = fmtDueDateTime(row);
 
   return (
     <div style={{
@@ -506,8 +557,8 @@ function ActivityRow({ row, onOpenCompany, onMarkDone, onOpenDetail }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: statusMeta.color, flexShrink: 0, whiteSpace: "nowrap" }}>
-        {statusMeta.label}
+      <div style={{ fontSize: 11, fontWeight: 700, color, flexShrink: 0, whiteSpace: "nowrap" }}>
+        {label}
       </div>
 
       <button onClick={onOpenDetail} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", flexShrink: 0, display: "flex" }}>
@@ -524,12 +575,9 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
   const Icon = ch.Icon;
   const status = row.done ? "done" : activityStatus(row);
   const [editingActivity, setEditingActivity] = useState(false);
-  const statusMeta = {
-    overdue: { label: "Atrasada", color: "#F87171" },
-    today: { label: "Hoje", color: "#FBBF24" },
-    upcoming: { label: fmtDate(row.dueDate), color: "#475569" },
-    done: { label: "Concluída", color: "#22C55E" },
-  }[status];
+  
+  const color = status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : status === "done" ? "#22C55E" : "#64748B";
+  const label = fmtDueDateTime(row);
 
   const canEdit = !row.isExtra && flows && saveFlows;
 
@@ -595,8 +643,7 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, color: "#F1F5F9" }}>{row.activity.title}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: statusMeta.color }}>{statusMeta.label}</div>
-            {row.activity.time && <span style={{ fontSize: 11, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "1px 7px" }}>{row.activity.time}</span>}
+            <div style={{ fontSize: 11.5, fontWeight: 700, color }}>{label}</div>
           </div>
         </div>
       </div>
@@ -700,8 +747,37 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: 12.5, color: "#F1F5F9", marginBottom: 3 }}>{co.name}</div>
-                    <div style={{ fontSize: 10.5, color: "#475569" }}>{co.segment || "Sem segmento"}</div>
+                    <div style={{ fontSize: 10.5, color: "#475569", marginBottom: 6 }}>{co.segment || "Sem segmento"}</div>
                     <KanbanCardProgress company={co} flow={flow} />
+                    
+                    {(() => {
+                      const nextAct = getNextPendingActivity(co, flows);
+                      if (!nextAct) {
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, fontSize: 10.5, color: "#22C55E" }}>
+                            <CheckCircle2 size={11} /> Sem pendências
+                          </div>
+                        );
+                      }
+                      const ch = CHANNELS[nextAct.activity.channel];
+                      const Icon = ch?.Icon || Circle;
+                      const actStatus = activityStatus(nextAct);
+                      const actColor = actStatus === "overdue" ? "#F87171" : actStatus === "today" ? "#FBBF24" : "#64748B";
+                      
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8, paddingTop: 6, borderTop: "1px solid #1E293B" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: "#94A3B8" }}>
+                            <Icon size={11} color={ch?.color || "#94A3B8"} />
+                            <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
+                              {nextAct.activity.title}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: actColor }}>
+                            {fmtDueDateTime(nextAct)}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
                 {stageCompanies.length === 0 && (
@@ -1409,6 +1485,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
   const [email, setEmail] = useState("");
   const [segment, setSegment] = useState("");
   const [flowId, setFlowId] = useState(flows[0]?.id || "");
+  const [startDate, setStartDate] = useState(todayISO());
 
   const canSave = name.trim() && flowId;
 
@@ -1417,7 +1494,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
     const flow = flows.find(f => f.id === flowId);
     onCreate({
       id: uid("co"), name: name.trim(), phone: phone.trim(), email: email.trim(), segment: segment.trim(),
-      flowId, stageId: flow.stages[0]?.id, stageStartDate: todayISO(), history: [],
+      flowId, stageId: flow.stages[0]?.id, stageStartDate: startDate || todayISO(), history: [],
       createdAt: new Date().toISOString(),
     });
   };
@@ -1446,6 +1523,26 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
           {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
+
+      <FieldLabel>Início das atividades</FieldLabel>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          type="button"
+          onClick={() => setStartDate(todayISO())}
+          style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", border: "1px solid #1E3A5F", borderRadius: 7, padding: "6px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          Hoje
+        </button>
+      </div>
+      <div style={{ fontSize: 10.5, color: "#475569", marginTop: 4 }}>
+        O Dia 1 das atividades do fluxo será contado a partir dessa data.
+      </div>
 
       <button
         onClick={save} disabled={!canSave}
@@ -1485,10 +1582,13 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
     await update({ history });
   };
 
-  const advanceStage = async () => {
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+
+  const advanceStage = async (startDate) => {
     if (!flow || stageIdx === -1 || stageIdx >= flow.stages.length - 1) return;
     const nextStage = flow.stages[stageIdx + 1];
-    await update({ stageId: nextStage.id, stageStartDate: todayISO() });
+    await update({ stageId: nextStage.id, stageStartDate: startDate || todayISO() });
+    setShowAdvanceModal(false);
   };
 
   const markFrio = async () => { await update({ status: "frio" }); };
@@ -1584,12 +1684,24 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
         <InfoChip label="E-mail" value={company.email || "—"} />
         <InfoChip label="Fluxo" value={flow?.name || "—"} />
         <InfoChip label="Etapa atual" value={flow?.stages[stageIdx]?.name || "—"} accent={flow?.stages[stageIdx]?.color} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>Início das atividades</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="date"
+              value={company.stageStartDate || todayISO()}
+              onChange={e => update({ stageStartDate: e.target.value })}
+              style={{ background: "#0B0E18", border: "1px solid #1E293B", borderRadius: 7, padding: "4px 8px", color: "#E2E8F0", fontSize: 12, outline: "none", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 10.5, color: "#475569" }}>Dia 1 do fluxo</span>
+          </div>
+        </div>
       </div>
 
       {flow && stageIdx > -1 && stageIdx < flow.stages.length - 1 && (
         <div style={{ background: "#0D1120", border: "1px solid #25C99E30", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 12, color: "#94A3B8" }}>Lead respondeu? Avance pra próxima etapa do fluxo manualmente.</span>
-          <button onClick={advanceStage} style={{ background: "#1E293B", border: "1px solid #25C99E40", borderRadius: 7, padding: "7px 12px", color: "#25C99E", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 12, color: "#94A3B8" }}>Lead respondeu? Avançar para: <strong style={{ color: "#E2E8F0" }}>{flow.stages[stageIdx + 1]?.name}</strong></span>
+          <button onClick={() => setShowAdvanceModal(true)} style={{ background: "#1E293B", border: "1px solid #25C99E40", borderRadius: 7, padding: "7px 12px", color: "#25C99E", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
             Avançar etapa <ChevronRight size={13} />
           </button>
         </div>
@@ -1621,8 +1733,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                       {items.sort((a, b) => (a.activity.time || "").localeCompare(b.activity.time || "")).map((item, i) => {
                         const ch = CHANNELS[item.activity.channel];
                         const Icon = ch.Icon;
-                        const status = activityStatus(item);
                         const globalIdx = agenda.indexOf(item);
+                        const statusColor = item.done ? "#22C55E" : activityStatus(item) === "overdue" ? "#F87171" : activityStatus(item) === "today" ? "#FBBF24" : "#475569";
                         return (
                           <div
                             key={item.activity.id + i}
@@ -1637,11 +1749,10 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                             <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
-                              <div style={{ fontSize: 10.5, color: status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : "#475569" }}>
-                                {item.done ? `Feito em ${new Date(item.doneAt).toLocaleDateString("pt-BR")}` : fmtDate(item.dueDate)}
+                              <div style={{ fontSize: 10.5, color: statusColor }}>
+                                {fmtDueDateTime(item)}
                               </div>
                             </div>
-                            {item.activity.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{item.activity.time}</span>}
                             <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
                           </div>
                         );
@@ -1658,8 +1769,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                     {extras.map((item, i) => {
                       const ch = CHANNELS[item.activity.channel];
                       const Icon = ch.Icon;
-                      const status = activityStatus(item);
                       const globalIdx = agenda.indexOf(item);
+                      const statusColor = item.done ? "#22C55E" : activityStatus(item) === "overdue" ? "#F87171" : activityStatus(item) === "today" ? "#FBBF24" : "#475569";
                       return (
                         <div
                           key={item.activity.id + i}
@@ -1677,8 +1788,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                               {item.activity.title}
                               <span style={{ fontSize: 9, color: "#F472B6", background: "#F472B615", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>avulsa</span>
                             </div>
-                            <div style={{ fontSize: 10.5, color: status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : "#475569" }}>
-                              {item.done ? `Feito em ${new Date(item.doneAt).toLocaleDateString("pt-BR")}` : fmtDate(item.dueDate)}
+                            <div style={{ fontSize: 10.5, color: statusColor }}>
+                              {fmtDueDateTime(item)}
                             </div>
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); deleteExtraActivity(item.activity.id); }} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", flexShrink: 0 }}>
@@ -1720,8 +1831,13 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
         <EditCompanyModal company={company} flows={flows} onClose={() => setEditing(false)} onSave={async (patch) => { await update(patch); setEditing(false); }} />
       )}
 
-      {addingActivity && (
-        <ExtraActivityModal onClose={() => setAddingActivity(false)} onSave={addExtraActivity} />
+      {addingActivity && <ExtraActivityModal onClose={() => setAddingActivity(false)} onSave={addExtraActivity} />}
+      {showAdvanceModal && (
+        <AdvanceStageModal
+          nextStageName={flow?.stages[stageIdx + 1]?.name || "próxima etapa"}
+          onClose={() => setShowAdvanceModal(false)}
+          onConfirm={advanceStage}
+        />
       )}
 
       {showWinModal && (
@@ -1751,18 +1867,53 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   );
 }
 
+// Modal para confirmar o avanço de etapa e definir a data de início da nova cadência.
+function AdvanceStageModal({ nextStageName, onClose, onConfirm }) {
+  const [startDate, setStartDate] = useState(todayISO());
+  return (
+    <ModalShell onClose={onClose} title={`Avançar para: ${nextStageName}`}>
+      <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 0, marginBottom: 16 }}>
+        Defina quando começam as atividades da nova etapa. O Dia 1 do fluxo será contado a partir dessa data.
+      </p>
+      <FieldLabel>Início das atividades na nova etapa</FieldLabel>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          type="button"
+          onClick={() => setStartDate(todayISO())}
+          style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", border: "1px solid #1E3A5F", borderRadius: 7, padding: "6px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          Hoje
+        </button>
+      </div>
+      <button
+        onClick={() => onConfirm(startDate)}
+        style={{ width: "100%", padding: "11px", borderRadius: 9, border: "none", background: "linear-gradient(135deg, #25C99E, #38BDF8)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer" }}
+      >
+        Confirmar avanço
+      </button>
+    </ModalShell>
+  );
+}
+
 // Modal simples pra adicionar uma atividade avulsa (fora do fluxo) direto na ficha da empresa.
 function ExtraActivityModal({ onClose, onSave }) {
   const [channel, setChannel] = useState("whatsapp");
   const [title, setTitle] = useState("");
   const [script, setScript] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [time, setTime] = useState("09:00");
 
-  const canSave = title.trim();
+  const canSave = title.trim() && date && time;
 
   const save = () => {
     if (!canSave) return;
-    onSave({ id: uid("ext"), channel, title: title.trim(), script, dueDate: date });
+    onSave({ id: uid("ext"), channel, title: title.trim(), script, dueDate: date, time });
   };
 
   return (
@@ -1785,8 +1936,16 @@ function ExtraActivityModal({ onClose, onSave }) {
         })}
       </div>
 
-      <FieldLabel>Data</FieldLabel>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, width: 160 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Data</FieldLabel>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <FieldLabel>Horário</FieldLabel>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inputStyle} />
+        </div>
+      </div>
 
       <FieldLabel>Título</FieldLabel>
       <TextInput value={title} onChange={setTitle} placeholder="Ex: Ligação de retorno, follow-up extra…" autoFocus />
@@ -2142,6 +2301,7 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
                           <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 9, background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: "8px 10px" }}>
                             <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
                             <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#6366F1", background: "#1a1840", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>Dia {act.day}</span>
                             {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{act.time}</span>}
                             <button
                               onClick={() => setActivityModal({ stageId: stage.id, activity: act })}
