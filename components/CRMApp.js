@@ -577,6 +577,72 @@ function ActivityRow({ row, onOpenCompany, onMarkDone, onOpenDetail }) {
   );
 }
 
+// Substitui variáveis do script pelo dado real da empresa
+function replaceScriptVars(script, company) {
+  if (!script) return "";
+  return script
+    .replace(/\[empresa\]/gi, company.name || "")
+    .replace(/\[Nome da Empresa\]/gi, company.name || "")
+    .replace(/\[nome\]/gi, company.decisor || company.name || "")
+    .replace(/\[telefone\]/gi, company.phone || "")
+    .replace(/\[email\]/gi, company.email || "")
+    .replace(/\[decisor\]/gi, company.decisor || "")
+    .replace(/\[cnpj\]/gi, company.cnpj || "")
+    .replace(/\[segmento\]/gi, company.segment || "")
+    .replace(/\[obs\]/gi, company.obs || "");
+}
+
+// Bloco de script com botão de copiar
+function ScriptBlock({ script, company }) {
+  const [copied, setCopied] = useState(false);
+  const resolved = replaceScriptVars(script, company);
+
+  const handleCopy = async () => {
+    if (!resolved) return;
+    try {
+      await navigator.clipboard.writeText(resolved);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback para navegadores sem suporte
+      const ta = document.createElement("textarea");
+      ta.value = resolved;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <FieldLabel>Script</FieldLabel>
+        {resolved && (
+          <button
+            onClick={handleCopy}
+            style={{
+              display: "flex", alignItems: "center", gap: 5, background: copied ? "#052e16" : "#0D1120",
+              border: `1px solid ${copied ? "#25D36660" : "#141A2B"}`, borderRadius: 7,
+              padding: "5px 10px", color: copied ? "#86EFAC" : "#64748B", fontSize: 11, fontWeight: 700,
+              cursor: "pointer", transition: "all 0.2s",
+            }}
+          >
+            {copied ? <><Check size={12} /> Copiado!</> : <><FileSpreadsheet size={12} /> Copiar</>}
+          </button>
+        )}
+      </div>
+      <div style={{ background: "#070A12", border: "1px solid #141A2B", borderRadius: 10, padding: "14px 16px", fontSize: 13.5, color: "#CBD5E1", whiteSpace: "pre-line", lineHeight: 1.8 }}>
+        {resolved ? resolved : <span style={{ color: "#334155" }}>Sem script cadastrado pra essa atividade.</span>}
+      </div>
+    </>
+  );
+}
+
 // Drawer (painel lateral) com o detalhe de uma atividade — script completo,
 // marcar como feita, ir pra ficha da empresa, e navegar pra próxima/anterior atividade da lista.
 function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleDone, onOpenCompany, hideOpenCompany, onClose, flows, saveFlows }) {
@@ -657,10 +723,7 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
         </div>
       </div>
 
-      <FieldLabel>Script</FieldLabel>
-      <div style={{ background: "#070A12", border: "1px solid #141A2B", borderRadius: 10, padding: "14px 16px", fontSize: 13.5, color: "#CBD5E1", whiteSpace: "pre-line", lineHeight: 1.8 }}>
-        {row.activity.script ? row.activity.script.replace(/\[Nome da Empresa\]/g, row.company.name) : <span style={{ color: "#334155" }}>Sem script cadastrado pra essa atividade.</span>}
-      </div>
+      <ScriptBlock script={row.activity.script} company={row.company} />
 
       <div style={{ display: "flex", gap: 14, marginTop: 16, flexWrap: "wrap" }}>
         {row.company.phone && <InfoChip label="Telefone" value={row.company.phone} />}
