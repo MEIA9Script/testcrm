@@ -725,8 +725,29 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
 
       <ScriptBlock script={row.activity.script} company={row.company} />
 
-      <div style={{ display: "flex", gap: 14, marginTop: 16, flexWrap: "wrap" }}>
-        {row.company.phone && <InfoChip label="Telefone" value={row.company.phone} />}
+      <div style={{ display: "flex", gap: 14, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {row.company.phone && (() => {
+          let cleanPhone = String(row.company.phone).replace(/\D/g, "");
+          if (cleanPhone && cleanPhone.length <= 11) cleanPhone = "55" + cleanPhone;
+          const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(replaceScriptVars(row.activity.script, row.company))}` : "";
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <InfoChip label="Telefone" value={row.company.phone} />
+              {waLink && (
+                <a 
+                  href={waLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  title="Abrir no WhatsApp"
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "#052e16", border: "1px solid #25D36660", color: "#25D366", padding: "4px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: "none" }}
+                >
+                  <MessageCircle size={12} />
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          );
+        })()}
         {row.company.email && <InfoChip label="E-mail" value={row.company.email} />}
       </div>
 
