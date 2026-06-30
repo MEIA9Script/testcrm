@@ -1054,7 +1054,7 @@ function readWorkbookFile(file) {
   });
 }
 
-const COMPANY_EXPORT_HEADERS = ["Nome", "Telefone", "Email", "Segmento", "Fluxo", "Etapa", "Status"];
+const COMPANY_EXPORT_HEADERS = ["Nome", "Telefone", "Email", "Segmento", "Decisor", "CNPJ", "Obs", "Fluxo", "Etapa", "Status"];
 const ACTIVITY_EXPORT_HEADERS = ["Etapa", "Canal", "Dia", "Horario", "Titulo", "Script"];
 
 function companiesToRows(companies, flows) {
@@ -1063,6 +1063,7 @@ function companiesToRows(companies, flows) {
     const stage = flow?.stages.find(s => s.id === c.stageId);
     return {
       Nome: c.name, Telefone: c.phone || "", Email: c.email || "", Segmento: c.segment || "",
+      Decisor: c.decisor || "", CNPJ: c.cnpj || "", Obs: c.obs || "",
       Fluxo: flow?.name || "", Etapa: stage?.name || "", Status: c.status || "ativo",
     };
   });
@@ -1080,11 +1081,11 @@ function activitiesToRows(flow) {
 
 function sampleCompanyRows() {
   return [
-    { Nome: "Salão Beleza Pura", Telefone: "11999990001", Email: "contato@belezapura.com.br", Segmento: "Salão de beleza", Fluxo: "", Etapa: "", Status: "ativo" },
-    { Nome: "Pizzaria do Bairro", Telefone: "11999990002", Email: "pizzariadobairro@gmail.com", Segmento: "Restaurante", Fluxo: "", Etapa: "", Status: "ativo" },
-    { Nome: "Pet Shop Amigo Fiel", Telefone: "11999990003", Email: "contato@amigofiel.com.br", Segmento: "Pet shop", Fluxo: "", Etapa: "", Status: "ativo" },
-    { Nome: "Loja Estilo & Cia", Telefone: "11999990004", Email: "vendas@estiloecia.com", Segmento: "Loja de roupas", Fluxo: "", Etapa: "", Status: "ativo" },
-    { Nome: "Barbearia Navalha de Ouro", Telefone: "11999990005", Email: "", Segmento: "Barbearia", Fluxo: "", Etapa: "", Status: "ativo" },
+    { Nome: "Salão Beleza Pura", Telefone: "11999990001", Email: "contato@belezapura.com.br", Segmento: "Salão de beleza", Decisor: "Maria Silva", CNPJ: "12.345.678/0001-90", Obs: "Tem site desatualizado, precisa de reformulação", Fluxo: "", Etapa: "", Status: "ativo" },
+    { Nome: "Pizzaria do Bairro", Telefone: "11999990002", Email: "pizzariadobairro@gmail.com", Segmento: "Restaurante", Decisor: "João Souza", CNPJ: "98.765.432/0001-10", Obs: "Sem site, apenas perfil no Google com 10 avaliações", Fluxo: "", Etapa: "", Status: "ativo" },
+    { Nome: "Pet Shop Amigo Fiel", Telefone: "11999990003", Email: "contato@amigofiel.com.br", Segmento: "Pet shop", Decisor: "", CNPJ: "", Obs: "", Fluxo: "", Etapa: "", Status: "ativo" },
+    { Nome: "Loja Estilo & Cia", Telefone: "11999990004", Email: "vendas@estiloecia.com", Segmento: "Loja de roupas", Decisor: "Ana Costa", CNPJ: "11.222.333/0001-44", Obs: "Site com erro de carregamento", Fluxo: "", Etapa: "", Status: "ativo" },
+    { Nome: "Barbearia Navalha de Ouro", Telefone: "11999990005", Email: "", Segmento: "Barbearia", Decisor: "", CNPJ: "", Obs: "Perfil sem site, imagens do local", Fluxo: "", Etapa: "", Status: "ativo" },
   ];
 }
 
@@ -1225,6 +1226,9 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
           phone: String(row.Telefone || row.telefone || ""),
           email: String(row.Email || row.email || ""),
           segment: String(row.Segmento || row.segmento || row.Nicho || row.nicho || ""),
+          decisor: String(row["nome decisor"] || row["Nome decisor"] || row["Nome Decisor"] || row.Decisor || row.decisor || ""),
+          cnpj: String(row.CNPJ || row.cnpj || row.Cnpj || ""),
+          obs: String(row.obs || row.Obs || row.OBS || row["Observação"] || row["observação"] || row["Observações"] || row["observações"] || ""),
           flowId: targetFlow || null,
           stageId: firstStageId || null,
           stageStartDate: todayISO(),
@@ -1262,7 +1266,7 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
   };
 
   return (
-    <ConfigCard icon={Upload} color="#38BDF8" title="Importar empresas" description="Envie um .csv ou .xlsx com as colunas Nome, Telefone, Email, Segmento. Empresas com nome já cadastrado são puladas automaticamente.">
+    <ConfigCard icon={Upload} color="#38BDF8" title="Importar empresas" description="Envie um .csv ou .xlsx com as colunas Nome, Telefone, Email, Segmento, Decisor, CNPJ, Obs. Empresas com nome já cadastrado são puladas automaticamente.">
       {flows.length === 0 ? (
         <div style={{ fontSize: 12, color: "#F87171" }}>Crie um fluxo primeiro na aba “Fluxos” pra poder importar.</div>
       ) : pendingImport ? (
@@ -1295,6 +1299,9 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
                     <th style={{ paddingBottom: 6 }}>Telefone</th>
                     <th style={{ paddingBottom: 6 }}>Email</th>
                     <th style={{ paddingBottom: 6 }}>Segmento</th>
+                    <th style={{ paddingBottom: 6 }}>Decisor</th>
+                    <th style={{ paddingBottom: 6 }}>CNPJ</th>
+                    <th style={{ paddingBottom: 6 }}>Obs</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1303,6 +1310,9 @@ function ImportCompaniesConfig({ companies, flows, saveCompanies, onResult }) {
                     <td style={{ padding: "6px 0" }}>11999990002</td>
                     <td style={{ padding: "6px 0" }}>contato@pizzaria.com</td>
                     <td style={{ padding: "6px 0", color: "#64748B" }}>Restaurante</td>
+                    <td style={{ padding: "6px 0" }}>João Silva</td>
+                    <td style={{ padding: "6px 0" }}>12.345.678/0001-90</td>
+                    <td style={{ padding: "6px 0", color: "#64748B" }}>Sem site, 10 avaliações</td>
                   </tr>
                 </tbody>
               </table>
@@ -1493,6 +1503,9 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [segment, setSegment] = useState("");
+  const [decisor, setDecisor] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [obs, setObs] = useState("");
   const [flowId, setFlowId] = useState(flows[0]?.id || "");
   const [startDate, setStartDate] = useState(todayISO());
 
@@ -1503,6 +1516,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
     const flow = flows.find(f => f.id === flowId);
     onCreate({
       id: uid("co"), name: name.trim(), phone: phone.trim(), email: email.trim(), segment: segment.trim(),
+      decisor: decisor.trim(), cnpj: cnpj.trim(), obs: obs.trim(),
       flowId, stageId: flow.stages[0]?.id, stageStartDate: startDate || todayISO(), history: [],
       createdAt: new Date().toISOString(),
     });
@@ -1521,6 +1535,19 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
 
       <FieldLabel>Segmento</FieldLabel>
       <TextInput value={segment} onChange={setSegment} placeholder="Ex: Salão de beleza, Restaurante…" />
+
+      <FieldLabel>Nome do Decisor</FieldLabel>
+      <TextInput value={decisor} onChange={setDecisor} placeholder="Nome de quem decide" />
+
+      <FieldLabel>CNPJ</FieldLabel>
+      <TextInput value={cnpj} onChange={setCnpj} placeholder="00.000.000/0001-00" />
+
+      <FieldLabel>Observações</FieldLabel>
+      <textarea
+        value={obs} onChange={e => setObs(e.target.value)} placeholder="Anotações sobre o lead…"
+        rows={2}
+        style={{ width: "100%", background: "#070A12", border: "1px solid #1E293B", borderRadius: 9, padding: "9px 12px", color: "#E2E8F0", fontSize: 12.5, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+      />
 
       <FieldLabel>Fluxo</FieldLabel>
       {flows.length === 0 ? (
@@ -1691,6 +1718,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
         <InfoChip label="Telefone" value={company.phone || "—"} />
         <InfoChip label="E-mail" value={company.email || "—"} />
+        {company.decisor && <InfoChip label="Decisor" value={company.decisor} />}
+        {company.cnpj && <InfoChip label="CNPJ" value={company.cnpj} />}
         <InfoChip label="Fluxo" value={flow?.name || "—"} />
         <InfoChip label="Etapa atual" value={flow?.stages[stageIdx]?.name || "—"} accent={flow?.stages[stageIdx]?.color} />
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -1706,6 +1735,13 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
           </div>
         </div>
       </div>
+
+      {company.obs && (
+        <div style={{ background: "#0D1120", border: "1px solid #141A2B", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 700, color: "#FB923C", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>📝 Observações</div>
+          <div style={{ fontSize: 13, color: "#CBD5E1", lineHeight: 1.7, whiteSpace: "pre-line" }}>{company.obs}</div>
+        </div>
+      )}
 
       {flow && stageIdx > -1 && stageIdx < flow.stages.length - 1 && (
         <div style={{ background: "#0D1120", border: "1px solid #25C99E30", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
@@ -2049,6 +2085,9 @@ function EditCompanyModal({ company, flows, onClose, onSave }) {
   const [phone, setPhone] = useState(company.phone || "");
   const [email, setEmail] = useState(company.email || "");
   const [segment, setSegment] = useState(company.segment || "");
+  const [decisor, setDecisor] = useState(company.decisor || "");
+  const [cnpj, setCnpj] = useState(company.cnpj || "");
+  const [obs, setObs] = useState(company.obs || "");
 
   return (
     <ModalShell onClose={onClose} title="Editar empresa">
@@ -2060,8 +2099,18 @@ function EditCompanyModal({ company, flows, onClose, onSave }) {
       <TextInput value={email} onChange={setEmail} />
       <FieldLabel>Segmento</FieldLabel>
       <TextInput value={segment} onChange={setSegment} />
+      <FieldLabel>Nome do Decisor</FieldLabel>
+      <TextInput value={decisor} onChange={setDecisor} placeholder="Nome de quem decide" />
+      <FieldLabel>CNPJ</FieldLabel>
+      <TextInput value={cnpj} onChange={setCnpj} placeholder="00.000.000/0001-00" />
+      <FieldLabel>Observações</FieldLabel>
+      <textarea
+        value={obs} onChange={e => setObs(e.target.value)} placeholder="Anotações sobre o lead…"
+        rows={3}
+        style={{ width: "100%", background: "#070A12", border: "1px solid #1E293B", borderRadius: 9, padding: "9px 12px", color: "#E2E8F0", fontSize: 12.5, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+      />
       <button
-        onClick={() => onSave({ name: name.trim() || company.name, phone, email, segment })}
+        onClick={() => onSave({ name: name.trim() || company.name, phone, email, segment, decisor, cnpj, obs })}
         style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 9, border: "none", background: "linear-gradient(135deg, #6366F1, #38BDF8)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer" }}
       >
         Salvar alterações
