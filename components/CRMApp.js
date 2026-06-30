@@ -2362,14 +2362,14 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
 
   const activeFlow = flows.find(f => f.id === activeFlowId);
 
-  const createFlow = async (name, stageNames) => {
+  const createFlow = async (name, stageNames, owner) => {
     const stages = stageNames.map((n, i) => ({
       id: uid("st"),
       name: n,
       color: STAGE_COLORS[i % STAGE_COLORS.length],
       activities: [],
     }));
-    const newFlow = { id: uid("flow"), name, stages };
+    const newFlow = { id: uid("flow"), name, owner, stages };
     await saveFlows([...flows, newFlow]);
     setActiveFlowId(newFlow.id);
     setShowNewFlow(false);
@@ -2458,6 +2458,7 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
 
 function NewFlowModal({ onClose, onCreate }) {
   const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
   const [stages, setStages] = useState([
     "Entrada de Leads",
     "Contato Realizado",
@@ -2483,6 +2484,9 @@ function NewFlowModal({ onClose, onCreate }) {
       <FieldLabel>Nome do fluxo</FieldLabel>
       <TextInput value={name} onChange={setName} placeholder="Ex: Cadência Restaurantes" autoFocus />
       
+      <FieldLabel>Proprietário (Opcional)</FieldLabel>
+      <TextInput value={owner} onChange={setOwner} placeholder="Ex: João, Maria..." />
+      
       <div style={{ marginTop: 16 }}>
         <FieldLabel>Etapas Padrão</FieldLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2506,7 +2510,7 @@ function NewFlowModal({ onClose, onCreate }) {
 
       <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
         <button
-          onClick={() => canSave && onCreate(name.trim(), stages.filter(s => s.trim()))}
+          onClick={() => canSave && onCreate(name.trim(), stages.filter(s => s.trim()), owner.trim())}
           disabled={!canSave}
           style={{ flex: 1, padding: "11px", borderRadius: 9, border: "none", background: canSave ? "linear-gradient(135deg, #6366F1, #38BDF8)" : "#1E293B", color: canSave ? "#fff" : "#475569", fontWeight: 800, fontSize: 13.5, cursor: canSave ? "pointer" : "not-allowed" }}
         >
@@ -2526,6 +2530,7 @@ function NewFlowModal({ onClose, onCreate }) {
 function FlowEditor({ flow, onUpdate, onDelete }) {
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(flow.name);
+  const [ownerInput, setOwnerInput] = useState(flow.owner || "");
   const [activityModal, setActivityModal] = useState(null); // { stageId, activity? }
   const [stageModal, setStageModal] = useState(false);
   const [previewDate, setPreviewDate] = useState(todayISO()); // data de referência para visualizar datas reais
@@ -2580,14 +2585,16 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         {renaming ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <TextInput value={nameInput} onChange={setNameInput} autoFocus style={{ width: 220 }} />
-            <button onClick={() => { onUpdate({ name: nameInput.trim() || flow.name }); setRenaming(false); }} style={smallBtnStyle("#25C99E")}>Salvar</button>
-            <button onClick={() => { setNameInput(flow.name); setRenaming(false); }} style={smallBtnStyle("#475569")}>Cancelar</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input value={nameInput} onChange={e => setNameInput(e.target.value)} autoFocus style={{ ...inputStyle, width: 220, padding: "5px 8px" }} />
+            <input value={ownerInput} onChange={e => setOwnerInput(e.target.value)} placeholder="Proprietário" style={{ ...inputStyle, width: 140, padding: "5px 8px" }} />
+            <button onClick={() => { onUpdate({ name: nameInput.trim() || flow.name, owner: ownerInput.trim() }); setRenaming(false); }} style={smallBtnStyle("#25C99E")}>Salvar</button>
+            <button onClick={() => { setNameInput(flow.name); setOwnerInput(flow.owner || ""); setRenaming(false); }} style={smallBtnStyle("#475569")}>Cancelar</button>
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontWeight: 800, fontSize: 17, color: "#F1F5F9" }}>{flow.name}</span>
+            {flow.owner && <span style={{ fontSize: 11, fontWeight: 700, color: "#38BDF8", background: "#38BDF815", padding: "3px 8px", borderRadius: 6 }}>👤 {flow.owner}</span>}
             <button onClick={() => setRenaming(true)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", display: "flex" }}><Edit3 size={14} /></button>
           </div>
         )}
