@@ -355,6 +355,8 @@ function TopBar({ view, setView, onNewCompany, companyCount, onLogout }) {
 
 // Returns array of { activity, stage, dayDate, status: 'done'|'today'|'upcoming'|'overdue' }
 function computeCompanyAgenda(company, flows) {
+  if (company.status === "numero_incorreto") return [];
+  
   const items = [];
   const flow = flows.find(f => f.id === company.flowId);
 
@@ -835,8 +837,10 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                     onDragStart={() => setDragId(co.id)}
                     onClick={() => onOpenCompany(co.id)}
                     style={{
-                      background: "#0D1120", border: "1px solid #141A2B", borderRadius: 9, padding: "10px 11px",
-                      cursor: "grab", borderLeft: `3px solid ${stage.color}`,
+                      background: co.status === "numero_incorreto" ? "#450a0a80" : "#0D1120", 
+                      border: `1px solid ${co.status === "numero_incorreto" ? "#F8717140" : "#141A2B"}`, 
+                      borderRadius: 9, padding: "10px 11px",
+                      cursor: "grab", borderLeft: `3px solid ${co.status === "numero_incorreto" ? "#F87171" : stage.color}`,
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: 12.5, color: "#F1F5F9", marginBottom: 3 }}>{co.name}</div>
@@ -1712,6 +1716,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   };
 
   const markFrio = async () => { await update({ status: "frio" }); };
+  const markInvalidPhone = async () => { await update({ status: "numero_incorreto" }); };
   const reactivate = async () => { await update({ status: "ativo", dealValue: null, lossReason: null, dealAt: null }); };
 
   const markWin = async (value) => {
@@ -1762,7 +1767,11 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 19, color: "#F1F5F9" }}>{company.name}</div>
-              <div style={{ fontSize: 11.5, color: "#475569" }}>{company.segment || "Sem segmento"}{company.status === "frio" && <span style={{ color: "#38BDF8", fontWeight: 700 }}> · ❄️ Frio</span>}</div>
+              <div style={{ fontSize: 11.5, color: "#475569" }}>
+                {company.segment || "Sem segmento"}
+                {company.status === "frio" && <span style={{ color: "#38BDF8", fontWeight: 700 }}> · ❄️ Frio</span>}
+                {company.status === "numero_incorreto" && <span style={{ color: "#F87171", fontWeight: 700 }}> · 🚫 Número Incorreto (Pausado)</span>}
+              </div>
             </div>
           </div>
         </div>
@@ -1772,10 +1781,13 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
             <>
               <IconButton onClick={() => setShowWinModal(true)} icon={Trophy} label="Ganho" accent="#25D366" />
               <IconButton onClick={() => setShowLossModal(true)} icon={ThumbsDown} label="Perdido" accent="#F87171" />
-              {company.status === "frio" ? (
+              {company.status === "frio" || company.status === "numero_incorreto" ? (
                 <IconButton onClick={reactivate} icon={Sparkles} label="Reativar" accent="#38BDF8" />
               ) : (
-                <IconButton onClick={markFrio} icon={Clock} label="Marcar frio" accent="#38BDF8" />
+                <>
+                  <IconButton onClick={markFrio} icon={Clock} label="Marcar frio" accent="#38BDF8" />
+                  <IconButton onClick={markInvalidPhone} icon={AlertCircle} label="Número incorreto" accent="#F87171" />
+                </>
               )}
             </>
           )}
