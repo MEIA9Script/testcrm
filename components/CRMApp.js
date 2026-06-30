@@ -355,8 +355,6 @@ function TopBar({ view, setView, onNewCompany, companyCount, onLogout }) {
 
 // Returns array of { activity, stage, dayDate, status: 'done'|'today'|'upcoming'|'overdue' }
 function computeCompanyAgenda(company, flows) {
-  if (company.status === "numero_incorreto") return [];
-  
   const items = [];
   const flow = flows.find(f => f.id === company.flowId);
 
@@ -366,6 +364,7 @@ function computeCompanyAgenda(company, flows) {
       const stage = flow.stages[stageIdx];
       const stageStart = company.stageStartDate ? new Date(company.stageStartDate + "T12:00:00") : new Date();
       for (const act of stage.activities) {
+        if (company.status === "numero_incorreto" && act.channel === "whatsapp") continue;
         const dueDate = addBusinessDays(stageStart, act.day - 1);
         const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
         items.push({
@@ -384,6 +383,7 @@ function computeCompanyAgenda(company, flows) {
   // Atividades avulsas adicionadas manualmente na ficha da empresa
   const extraStage = { id: "extra", name: "Atividade avulsa", color: "#F472B6" };
   for (const act of (company.extraActivities || [])) {
+    if (company.status === "numero_incorreto" && act.channel === "whatsapp") continue;
     const dueDate = act.dueDate ? new Date(act.dueDate + "T12:00:00") : new Date();
     const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === "extra");
     items.push({
@@ -1770,7 +1770,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
               <div style={{ fontSize: 11.5, color: "#475569" }}>
                 {company.segment || "Sem segmento"}
                 {company.status === "frio" && <span style={{ color: "#38BDF8", fontWeight: 700 }}> · ❄️ Frio</span>}
-                {company.status === "numero_incorreto" && <span style={{ color: "#F87171", fontWeight: 700 }}> · 🚫 Número Incorreto (Pausado)</span>}
+                {company.status === "numero_incorreto" && <span style={{ color: "#F87171", fontWeight: 700 }}> · 🚫 Número Incorreto (WhatsApp Pausado)</span>}
               </div>
             </div>
           </div>
