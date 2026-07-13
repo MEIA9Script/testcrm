@@ -10,6 +10,7 @@ create table if not exists crm_data (
   companies jsonb not null default '[]'::jsonb,
   flows jsonb not null default '[]'::jsonb,
   loss_reasons jsonb not null default '[]'::jsonb,
+  webhook_config jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
   constraint single_row check (id = 1)
 );

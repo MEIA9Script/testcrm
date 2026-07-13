@@ -12,6 +12,8 @@ import * as XLSX from "xlsx";
 import { useCRMData } from "../lib/useCRMData";
 import { createClient } from "../lib/supabase-browser";
 import { useRouter } from "next/navigation";
+import { WebhookConfigPanel } from "./WebhookConfigPanel";
+import { triggerWebhook } from "../lib/webhook";
 
 /* ============================================================
    CONSTANTS
@@ -124,13 +126,41 @@ function getNextPendingActivity(company, flows) {
 
 export default function CRMApp({ initialView = "dashboard" }) {
   const router = useRouter();
-  const { companies, flows, lossReasons, loaded, error, saveCompanies, saveFlows, saveLossReasons, setError } = useCRMData();
+  const { companies, flows, lossReasons, webhookConfig, loaded, error, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig, setError } = useCRMData();
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
   };
+  
+  const handleSaveCompanies = async (nextCompanies) => {
+    if (companies && nextCompanies && webhookConfig?.url) {
+      for (const nextCo of nextCompanies) {
+        const oldCo = companies.find(c => c.id === nextCo.id);
+        if (!oldCo) {
+          triggerWebhook(webhookConfig, 'on_lead_created', { company: nextCo });
+        } else {
+          if (oldCo.status !== nextCo.status) {
+            triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo });
+          }
+          if (oldCo.stageId !== nextCo.stageId && oldCo.status === nextCo.status) {
+            triggerWebhook(webhookConfig, 'on_stage_changed', { company: nextCo });
+          }
+          const oldHist = oldCo.history || [];
+          const nextHist = nextCo.history || [];
+          if (nextHist.length > oldHist.length) {
+            const newAct = nextHist.find(h => !oldHist.some(o => o.id === h.id));
+            if (newAct) {
+              triggerWebhook(webhookConfig, 'on_activity_done', { company: nextCo, activity: newAct });
+            }
+          }
+        }
+      }
+    }
+    await saveCompanies(nextCompanies);
+  };
+
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
   
   // Atualiza a URL automaticamente sem recarregar a página toda vez que trocar de aba
@@ -175,9 +205,9 @@ export default function CRMApp({ initialView = "dashboard" }) {
     });
 
     if (hasChanges) {
-      saveCompanies(nextCompanies);
+      handleSaveCompanies(nextCompanies);
     }
-  }, [loaded, flows, companies, saveCompanies]);
+  }, [loaded, flows, companies, saveCompanies, webhookConfig]);
 
   // Normaliza atividades sem horário — aplica o default por canal e salva
   useEffect(() => {
@@ -238,21 +268,21 @@ export default function CRMApp({ initialView = "dashboard" }) {
           <DashboardView companies={companies} flows={flows} setView={setView} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
         )}
         {view === "list" && (
-          <ListView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
+          <ListView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
         )}
         {view === "kanban" && (
-          <KanbanView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
+          <KanbanView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
         )}
         {view === "flows" && (
-          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={saveCompanies} />
+          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={handleSaveCompanies} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={saveCompanies} />
+          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
         )}
         {view === "config" && (
           <ConfigView
-            companies={companies} flows={flows} lossReasons={lossReasons}
-            saveCompanies={saveCompanies} saveFlows={saveFlows} saveLossReasons={saveLossReasons}
+            companies={companies} flows={flows} lossReasons={lossReasons} webhookConfig={webhookConfig}
+            saveCompanies={handleSaveCompanies} saveFlows={saveFlows} saveLossReasons={saveLossReasons} saveWebhookConfig={saveWebhookConfig}
           />
         )}
         {view === "company" && activeCompany && (
@@ -261,7 +291,7 @@ export default function CRMApp({ initialView = "dashboard" }) {
             flows={flows}
             companies={companies}
             lossReasons={lossReasons}
-            saveCompanies={saveCompanies}
+            saveCompanies={handleSaveCompanies}
             saveFlows={saveFlows}
             onBack={() => { setView("list"); setActiveCompanyId(null); }}
           />
@@ -276,7 +306,7 @@ export default function CRMApp({ initialView = "dashboard" }) {
           flows={flows}
           onClose={() => setShowNewCompany(false)}
           onCreate={async (newCo) => {
-            await saveCompanies([...companies, newCo]);
+            await handleSaveCompanies([...companies, newCo]);
             setShowNewCompany(false);
             setActiveCompanyId(newCo.id);
             setView("company");
@@ -1191,11 +1221,12 @@ function sampleActivityRows() {
    CONFIG VIEW — import/export companies & activities, loss reasons
    ============================================================ */
 
-function ConfigView({ companies, flows, lossReasons, saveCompanies, saveFlows, saveLossReasons }) {
+function ConfigView({ companies, flows, lossReasons, webhookConfig, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig }) {
   const [importResult, setImportResult] = useState(null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
+      <WebhookConfigPanel webhookConfig={webhookConfig} saveWebhookConfig={saveWebhookConfig} />
       <LossReasonsConfig lossReasons={lossReasons} saveLossReasons={saveLossReasons} />
       <ImportCompaniesConfig companies={companies} flows={flows} saveCompanies={saveCompanies} onResult={setImportResult} />
       <ExportCompaniesConfig companies={companies} flows={flows} />
