@@ -121,12 +121,88 @@ function getNextPendingActivity(company, flows) {
 }
 
 /* ============================================================
+   CONFIRM MODAL — replaces native confirm() / alert()
+   ============================================================ */
+
+function useConfirm() {
+  const [state, setState] = useState(null); // { title, message, confirmLabel, confirmColor, resolveRef }
+  const resolveRef = useRef(null);
+
+  const showConfirm = useCallback(({ title, message, confirmLabel = "Confirmar", confirmColor = "#F87171" }) => {
+    return new Promise((resolve) => {
+      resolveRef.current = resolve;
+      setState({ title, message, confirmLabel, confirmColor });
+    });
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    resolveRef.current?.(true);
+    setState(null);
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    resolveRef.current?.(false);
+    setState(null);
+  }, []);
+
+  const showAlert = useCallback(({ title, message }) => {
+    return new Promise((resolve) => {
+      resolveRef.current = resolve;
+      setState({ title, message, confirmLabel: "OK", confirmColor: "#38BDF8", isAlert: true });
+    });
+  }, []);
+
+  const ConfirmModalEl = state ? (
+    <ConfirmModal
+      title={state.title}
+      message={state.message}
+      confirmLabel={state.confirmLabel}
+      confirmColor={state.confirmColor}
+      isAlert={state.isAlert}
+      onConfirm={handleConfirm}
+      onCancel={handleCancel}
+    />
+  ) : null;
+
+  return { showConfirm, showAlert, ConfirmModalEl };
+}
+
+function ConfirmModal({ title, message, confirmLabel, confirmColor, isAlert, onConfirm, onCancel }) {
+  return (
+    <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "#000000a0", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#0B0E18", border: "1px solid #1E293B", borderRadius: 16, padding: 22, width: "100%", maxWidth: 380 }}>
+        <div style={{ fontWeight: 800, fontSize: 15.5, color: "#F1F5F9", marginBottom: 10 }}>{title || "Confirmar ação"}</div>
+        <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.7, marginBottom: 20 }}>{message}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!isAlert && (
+            <button
+              onClick={onCancel}
+              style={{ flex: 1, padding: "10px", borderRadius: 9, border: "1px solid #1E293B", background: "transparent", color: "#94A3B8", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              Cancelar
+            </button>
+          )}
+          <button
+            onClick={onConfirm}
+            autoFocus
+            style={{ flex: 1, padding: "10px", borderRadius: 9, border: "none", background: `linear-gradient(135deg, ${confirmColor}, ${confirmColor}cc)`, color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    ROOT APP
    ============================================================ */
 
 export default function CRMApp({ initialView = "dashboard" }) {
   const router = useRouter();
   const { companies, flows, lossReasons, webhookConfig, loaded, error, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig, setError } = useCRMData();
+  const { showConfirm, showAlert, ConfirmModalEl } = useConfirm();
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -183,13 +259,32 @@ export default function CRMApp({ initialView = "dashboard" }) {
 
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
 
-  // Atualiza a URL automaticamente sem recarregar a página toda vez que trocar de aba
+  // Sincroniza a URL com a view ativa e armazena o estado no histórico do navegador
   useEffect(() => {
-    // Evita loop infinito ou sobrescrever rota de login, etc.
     if (view && typeof window !== "undefined") {
-      window.history.pushState(null, '', '/' + view);
+      window.history.pushState({ view }, '', '/' + view);
     }
   }, [view]);
+
+  // Listener para o botão Voltar do navegador — sincroniza a view interna com o histórico
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state && event.state.view) {
+        setView(event.state.view);
+        setActiveCompanyId(null);
+      } else {
+        // Fallback: extrai a view da URL
+        const path = window.location.pathname.replace('/', '') || 'dashboard';
+        const validViews = ['dashboard', 'list', 'kanban', 'flows', 'negocios', 'config'];
+        if (validViews.includes(path)) {
+          setView(path);
+          setActiveCompanyId(null);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const [activeCompanyId, setActiveCompanyId] = useState(null);
   const [showNewCompany, setShowNewCompany] = useState(false);
@@ -294,15 +389,16 @@ export default function CRMApp({ initialView = "dashboard" }) {
           <KanbanView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
         )}
         {view === "flows" && (
-          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={handleSaveCompanies} />
+          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} showAlert={showAlert} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
+          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
         )}
         {view === "config" && (
           <ConfigView
             companies={companies} flows={flows} lossReasons={lossReasons} webhookConfig={webhookConfig}
             saveCompanies={handleSaveCompanies} saveFlows={saveFlows} saveLossReasons={saveLossReasons} saveWebhookConfig={saveWebhookConfig}
+            showConfirm={showConfirm}
           />
         )}
         {view === "company" && activeCompany && (
@@ -314,6 +410,7 @@ export default function CRMApp({ initialView = "dashboard" }) {
             saveCompanies={handleSaveCompanies}
             saveFlows={saveFlows}
             onBack={() => { setView("list"); setActiveCompanyId(null); }}
+            showConfirm={showConfirm}
           />
         )}
         {view === "company" && !activeCompany && (
@@ -333,6 +430,8 @@ export default function CRMApp({ initialView = "dashboard" }) {
           }}
         />
       )}
+
+      {ConfirmModalEl}
     </div>
   );
 }
@@ -894,7 +993,28 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: 12.5, color: "#F1F5F9", marginBottom: 3 }}>{co.name}</div>
-                    <div style={{ fontSize: 10.5, color: "#475569", marginBottom: 6 }}>{co.segment || "Sem segmento"}</div>
+                    <div style={{ fontSize: 10.5, color: "#475569", marginBottom: 2 }}>{co.segment || "Sem segmento"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                      {co.phone && (
+                        <span style={{ fontSize: 10.5, color: "#64748B", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Phone size={10} color="#475569" />
+                          {co.phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")}
+                        </span>
+                      )}
+                      {co.stageStartDate && (() => {
+                        const start = new Date(co.stageStartDate + "T12:00:00");
+                        const now = new Date();
+                        const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+                        const label = diffDays === 0 ? "hoje" : diffDays === 1 ? "há 1 dia" : `há ${diffDays} dias`;
+                        const color = diffDays > 7 ? "#F87171" : diffDays > 3 ? "#FBBF24" : "#475569";
+                        return (
+                          <span style={{ fontSize: 10.5, color, display: "flex", alignItems: "center", gap: 4 }}>
+                            <Clock size={10} />
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <KanbanCardProgress company={co} flow={flow} />
 
                     {(() => {
@@ -1062,7 +1182,7 @@ function StatCard({ label, value, sub, color, Icon }) {
    NEGÓCIOS VIEW — won/lost companies, separate from pipeline
    ============================================================ */
 
-function NegociosView({ companies, onOpenCompany, saveCompanies }) {
+function NegociosView({ companies, onOpenCompany, saveCompanies, showConfirm }) {
   const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -1085,7 +1205,8 @@ function NegociosView({ companies, onOpenCompany, saveCompanies }) {
   };
 
   const deleteSelected = async () => {
-    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} empresa(s)?`)) return;
+    const confirmed = await showConfirm({ title: "Excluir empresas", message: `Tem certeza que deseja excluir ${selectedIds.size} empresa(s)?`, confirmLabel: "Excluir", confirmColor: "#F87171" });
+    if (!confirmed) return;
     const next = companies.filter(c => !selectedIds.has(c.id));
     await saveCompanies(next);
     setSelectedIds(new Set());
@@ -1241,13 +1362,13 @@ function sampleActivityRows() {
    CONFIG VIEW — import/export companies & activities, loss reasons
    ============================================================ */
 
-function ConfigView({ companies, flows, lossReasons, webhookConfig, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig }) {
+function ConfigView({ companies, flows, lossReasons, webhookConfig, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig, showConfirm }) {
   const [importResult, setImportResult] = useState(null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
       <WebhookConfigPanel webhookConfig={webhookConfig} saveWebhookConfig={saveWebhookConfig} />
-      <LossReasonsConfig lossReasons={lossReasons} saveLossReasons={saveLossReasons} />
+      <LossReasonsConfig lossReasons={lossReasons} saveLossReasons={saveLossReasons} showConfirm={showConfirm} />
       <ImportCompaniesConfig companies={companies} flows={flows} saveCompanies={saveCompanies} onResult={setImportResult} />
       <ExportCompaniesConfig companies={companies} flows={flows} />
       <ImportActivitiesConfig flows={flows} saveFlows={saveFlows} onResult={setImportResult} />
@@ -1280,7 +1401,7 @@ function ConfigCard({ icon: Icon, color, title, description, children }) {
   );
 }
 
-function LossReasonsConfig({ lossReasons, saveLossReasons }) {
+function LossReasonsConfig({ lossReasons, saveLossReasons, showConfirm }) {
   const [newReason, setNewReason] = useState("");
   const [editingIdx, setEditingIdx] = useState(null);
   const [editValue, setEditValue] = useState("");
@@ -1293,7 +1414,8 @@ function LossReasonsConfig({ lossReasons, saveLossReasons }) {
   };
 
   const remove = async (idx) => {
-    if (!confirm("Excluir esse motivo?")) return;
+    const confirmed = await showConfirm({ title: "Excluir motivo", message: "Excluir esse motivo de perda?", confirmLabel: "Excluir", confirmColor: "#F87171" });
+    if (!confirmed) return;
     await saveLossReasons(lossReasons.filter((_, i) => i !== idx));
   };
 
@@ -1733,7 +1855,7 @@ function NewCompanyModal({ flows, onClose, onCreate }) {
    COMPANY VIEW — detail with history + agenda
    ============================================================ */
 
-function CompanyView({ company, flows, companies, lossReasons, saveCompanies, saveFlows, onBack }) {
+function CompanyView({ company, flows, companies, lossReasons, saveCompanies, saveFlows, onBack, showConfirm }) {
   const [editing, setEditing] = useState(false);
   const [addingActivity, setAddingActivity] = useState(false);
   const [activeIdx, setActiveIdx] = useState(null);
@@ -1757,13 +1879,12 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
     await update({ history });
   };
 
-  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [moveToStage, setMoveToStage] = useState(null);
 
-  const advanceStage = async (startDate) => {
-    if (!flow || stageIdx === -1 || stageIdx >= flow.stages.length - 1) return;
-    const nextStage = flow.stages[stageIdx + 1];
-    await update({ stageId: nextStage.id, stageStartDate: startDate || todayISO() });
-    setShowAdvanceModal(false);
+  const moveToStageConfirm = async (startDate) => {
+    if (!flow || !moveToStage) return;
+    await update({ stageId: moveToStage.id, stageStartDate: startDate || todayISO() });
+    setMoveToStage(null);
   };
 
   const markFrio = async () => { await update({ status: "frio" }); };
@@ -1781,7 +1902,8 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   };
 
   const deleteCompany = async () => {
-    if (!confirm(`Excluir "${company.name}"? Essa ação não pode ser desfeita.`)) return;
+    const confirmed = await showConfirm({ title: "Excluir empresa", message: `Excluir "${company.name}"? Essa ação não pode ser desfeita.`, confirmLabel: "Excluir", confirmColor: "#F87171" });
+    if (!confirmed) return;
     await saveCompanies(companies.filter(c => c.id !== company.id));
     onBack();
   };
@@ -1890,12 +2012,32 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
         </div>
       )}
 
-      {flow && stageIdx > -1 && stageIdx < flow.stages.length - 1 && (
-        <div style={{ background: "#0D1120", border: "1px solid #25C99E30", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 12, color: "#94A3B8" }}>Lead respondeu? Avançar para: <strong style={{ color: "#E2E8F0" }}>{flow.stages[stageIdx + 1]?.name}</strong></span>
-          <button onClick={() => setShowAdvanceModal(true)} style={{ background: "#1E293B", border: "1px solid #25C99E40", borderRadius: 7, padding: "7px 12px", color: "#25C99E", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
-            Avançar etapa <ChevronRight size={13} />
-          </button>
+      {flow && stageIdx > -1 && !isClosed && (
+        <div style={{ background: "#0D1120", border: "1px solid #1E293B", borderRadius: 10, padding: "12px 14px", marginTop: 14, marginBottom: 6 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Mover para etapa</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {flow.stages.map((s) => {
+              const isCurrent = s.id === company.stageId;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => { if (!isCurrent) setMoveToStage(s); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 7,
+                    border: `1px solid ${isCurrent ? s.color + "70" : "#1E293B"}`,
+                    background: isCurrent ? s.color + "18" : "#070A12",
+                    color: isCurrent ? s.color : "#94A3B8",
+                    fontSize: 11.5, fontWeight: 700, cursor: isCurrent ? "default" : "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ width: 7, height: 7, borderRadius: 99, background: s.color, flexShrink: 0 }} />
+                  {s.name}
+                  {isCurrent && <Check size={12} />}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -2024,11 +2166,11 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
       )}
 
       {addingActivity && <ExtraActivityModal onClose={() => setAddingActivity(false)} onSave={addExtraActivity} />}
-      {showAdvanceModal && (
+      {moveToStage && (
         <AdvanceStageModal
-          nextStageName={flow?.stages[stageIdx + 1]?.name || "próxima etapa"}
-          onClose={() => setShowAdvanceModal(false)}
-          onConfirm={advanceStage}
+          nextStageName={moveToStage.name}
+          onClose={() => setMoveToStage(null)}
+          onConfirm={moveToStageConfirm}
         />
       )}
 
@@ -2059,11 +2201,11 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   );
 }
 
-// Modal para confirmar o avanço de etapa e definir a data de início da nova cadência.
+// Modal para confirmar movimentação de etapa e definir a data de início da nova cadência.
 function AdvanceStageModal({ nextStageName, onClose, onConfirm }) {
   const [startDate, setStartDate] = useState(todayISO());
   return (
-    <ModalShell onClose={onClose} title={`Avançar para: ${nextStageName}`}>
+    <ModalShell onClose={onClose} title={`Mover para: ${nextStageName}`}>
       <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 0, marginBottom: 16 }}>
         Defina quando começam as atividades da nova etapa. O Dia 1 do fluxo será contado a partir dessa data.
       </p>
@@ -2087,7 +2229,7 @@ function AdvanceStageModal({ nextStageName, onClose, onConfirm }) {
         onClick={() => onConfirm(startDate)}
         style={{ width: "100%", padding: "11px", borderRadius: 9, border: "none", background: "linear-gradient(135deg, #25C99E, #38BDF8)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer" }}
       >
-        Confirmar avanço
+        Confirmar movimentação
       </button>
     </ModalShell>
   );
@@ -2406,7 +2548,7 @@ function BulkActivityModal({ onClose, onSave, companies, flows }) {
    FLOWS VIEW — create/edit flows + stages + activities
    ============================================================ */
 
-function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
+function FlowsView({ flows, saveFlows, companies, saveCompanies, showConfirm, showAlert }) {
   const [activeFlowId, setActiveFlowId] = useState(flows[0]?.id || null);
   const [showNewFlow, setShowNewFlow] = useState(false);
   const [showBulkActivity, setShowBulkActivity] = useState(false);
@@ -2436,8 +2578,9 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
 
   const deleteFlow = async (flowId) => {
     const inUse = companies.some(c => c.flowId === flowId);
-    if (inUse) { alert("Esse fluxo está em uso por empresas cadastradas. Mova as empresas pra outro fluxo antes de excluir."); return; }
-    if (!confirm("Excluir esse fluxo e todas as suas etapas?")) return;
+    if (inUse) { await showAlert({ title: "Fluxo em uso", message: "Esse fluxo está em uso por empresas cadastradas. Mova as empresas pra outro fluxo antes de excluir." }); return; }
+    const confirmed = await showConfirm({ title: "Excluir fluxo", message: "Excluir esse fluxo e todas as suas etapas?", confirmLabel: "Excluir", confirmColor: "#F87171" });
+    if (!confirmed) return;
     const next = flows.filter(f => f.id !== flowId);
     await saveFlows(next);
     setActiveFlowId(next[0]?.id || null);
@@ -2491,7 +2634,7 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
       )}
 
       {activeFlow && (
-        <FlowEditor flow={activeFlow} onUpdate={updateFlow} onDelete={() => deleteFlow(activeFlow.id)} />
+        <FlowEditor flow={activeFlow} onUpdate={updateFlow} onDelete={() => deleteFlow(activeFlow.id)} showConfirm={showConfirm} />
       )}
 
       {showNewFlow && <NewFlowModal onClose={() => setShowNewFlow(false)} onCreate={createFlow} />}
@@ -2578,7 +2721,7 @@ function NewFlowModal({ onClose, onCreate }) {
   );
 }
 
-function FlowEditor({ flow, onUpdate, onDelete }) {
+function FlowEditor({ flow, onUpdate, onDelete, showConfirm }) {
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(flow.name);
   const [ownerInput, setOwnerInput] = useState(flow.owner || "");
@@ -2605,7 +2748,8 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
   };
 
   const deleteStage = async (stageId) => {
-    if (!confirm("Excluir essa etapa e todas as suas atividades?")) return;
+    const confirmed = await showConfirm({ title: "Excluir etapa", message: "Excluir essa etapa e todas as suas atividades?", confirmLabel: "Excluir", confirmColor: "#F87171" });
+    if (!confirmed) return;
     await onUpdate({ stages: flow.stages.filter(s => s.id !== stageId) });
   };
 
