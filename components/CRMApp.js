@@ -21,8 +21,8 @@ import { triggerWebhook } from "../lib/webhook";
 
 const CHANNELS = {
   whatsapp: { label: "WhatsApp", color: "#25D366", bg: "#052e16", Icon: MessageCircle },
-  ligacao:  { label: "Ligação",  color: "#818CF8", bg: "#1e1b4b", Icon: Phone },
-  email:    { label: "E-mail",   color: "#FB923C", bg: "#1c0f05", Icon: Mail },
+  ligacao: { label: "Ligação", color: "#818CF8", bg: "#1e1b4b", Icon: Phone },
+  email: { label: "E-mail", color: "#FB923C", bg: "#1c0f05", Icon: Mail },
 };
 
 const STAGE_COLORS = ["#818CF8", "#38BDF8", "#25D366", "#FB923C", "#F472B6", "#FBBF24", "#A78BFA"];
@@ -101,11 +101,11 @@ function fmtDueDateTime(item) {
     const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return `Concluída em ${dateStr} às ${timeStr}`;
   }
-  
+
   const status = activityStatus(item);
   const dateStr = fmtDate(item.dueDate);
   const timeStr = item.activity.time || "09:00";
-  
+
   if (status === "today") {
     return `Hoje às ${timeStr}`;
   }
@@ -133,12 +133,12 @@ export default function CRMApp({ initialView = "dashboard" }) {
     router.push("/login");
     router.refresh();
   };
-  
+
   const handleSaveCompanies = async (nextCompanies) => {
     if (companies && nextCompanies && webhookConfig?.url) {
       for (const nextCo of nextCompanies) {
         const oldCo = companies.find(c => c.id === nextCo.id);
-        
+
         const flow = flows?.find(f => f.id === nextCo.flowId) || flows?.[0];
         const stage = flow?.stages?.find(s => s.id === nextCo.stageId);
         const webhookExtras = {
@@ -155,8 +155,8 @@ export default function CRMApp({ initialView = "dashboard" }) {
           if (oldCo.stageId !== nextCo.stageId && oldCo.status === nextCo.status) {
             const oldFlow = flows?.find(f => f.id === oldCo.flowId) || flows?.[0];
             const oldStage = oldFlow?.stages?.find(s => s.id === oldCo.stageId);
-            triggerWebhook(webhookConfig, 'on_stage_changed', { 
-              company: nextCo, 
+            triggerWebhook(webhookConfig, 'on_stage_changed', {
+              company: nextCo,
               ...webhookExtras,
               previousStageName: oldStage ? oldStage.name : null
             });
@@ -167,8 +167,8 @@ export default function CRMApp({ initialView = "dashboard" }) {
             const newAct = nextHist.find(h => !oldHist.some(o => o.id === h.id));
             if (newAct) {
               const actStage = flow?.stages?.find(s => s.id === newAct.stageId) || stage;
-              triggerWebhook(webhookConfig, 'on_activity_done', { 
-                company: nextCo, 
+              triggerWebhook(webhookConfig, 'on_activity_done', {
+                company: nextCo,
                 activity: newAct,
                 stageName: actStage ? actStage.name : null,
                 flowName: webhookExtras.flowName
@@ -182,7 +182,7 @@ export default function CRMApp({ initialView = "dashboard" }) {
   };
 
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
-  
+
   // Atualiza a URL automaticamente sem recarregar a página toda vez que trocar de aba
   useEffect(() => {
     // Evita loop infinito ou sobrescrever rota de login, etc.
@@ -585,7 +585,7 @@ function ActivityRow({ row, onOpenCompany, onMarkDone, onOpenDetail }) {
   const ch = CHANNELS[row.activity.channel];
   const Icon = ch.Icon;
   const status = row.done ? "done" : activityStatus(row);
-  
+
   const color = status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : status === "done" ? "#22C55E" : "#64748B";
   const label = fmtDueDateTime(row);
 
@@ -702,7 +702,7 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
   const Icon = ch.Icon;
   const status = row.done ? "done" : activityStatus(row);
   const [editingActivity, setEditingActivity] = useState(false);
-  
+
   const color = status === "overdue" ? "#F87171" : status === "today" ? "#FBBF24" : status === "done" ? "#22C55E" : "#64748B";
   const label = fmtDueDateTime(row);
 
@@ -786,9 +786,9 @@ function ActivityDetailDrawer({ row, hasNext, hasPrev, onNext, onPrev, onToggleD
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <InfoChip label="Telefone" value={row.company.phone} />
               {waLink && (
-                <a 
-                  href={waLink} 
-                  target="_blank" 
+                <a
+                  href={waLink}
+                  target="_blank"
                   rel="noopener noreferrer"
                   title="Abrir no WhatsApp"
                   style={{ display: "flex", alignItems: "center", gap: 5, background: "#052e16", border: "1px solid #25D36660", color: "#25D366", padding: "4px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: "none" }}
@@ -887,8 +887,8 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                     onDragStart={() => setDragId(co.id)}
                     onClick={() => onOpenCompany(co.id)}
                     style={{
-                      background: co.status === "numero_incorreto" ? "#450a0a80" : "#0D1120", 
-                      border: `1px solid ${co.status === "numero_incorreto" ? "#F8717140" : "#141A2B"}`, 
+                      background: co.status === "numero_incorreto" ? "#450a0a80" : "#0D1120",
+                      border: `1px solid ${co.status === "numero_incorreto" ? "#F8717140" : "#141A2B"}`,
                       borderRadius: 9, padding: "10px 11px",
                       cursor: "grab", borderLeft: `3px solid ${co.status === "numero_incorreto" ? "#F87171" : stage.color}`,
                     }}
@@ -896,7 +896,7 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                     <div style={{ fontWeight: 700, fontSize: 12.5, color: "#F1F5F9", marginBottom: 3 }}>{co.name}</div>
                     <div style={{ fontSize: 10.5, color: "#475569", marginBottom: 6 }}>{co.segment || "Sem segmento"}</div>
                     <KanbanCardProgress company={co} flow={flow} />
-                    
+
                     {(() => {
                       const nextAct = getNextPendingActivity(co, flows);
                       if (!nextAct) {
@@ -910,7 +910,7 @@ function KanbanView({ companies, allCompanies, flows, onOpenCompany, saveCompani
                       const Icon = ch?.Icon || Circle;
                       const actStatus = activityStatus(nextAct);
                       const actColor = actStatus === "overdue" ? "#F87171" : actStatus === "today" ? "#FBBF24" : "#64748B";
-                      
+
                       return (
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8, paddingTop: 6, borderTop: "1px solid #1E293B" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: "#94A3B8" }}>
@@ -1065,7 +1065,7 @@ function StatCard({ label, value, sub, color, Icon }) {
 function NegociosView({ companies, onOpenCompany, saveCompanies }) {
   const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
   const [selectedIds, setSelectedIds] = useState(new Set());
-  
+
   const filtered = filter === "all" ? companies : filter === "criado" ? companies.filter(c => c.status !== "ganho" && c.status !== "perdido") : companies.filter(c => c.status === filter);
   const sorted = [...filtered].sort((a, b) => new Date(b.dealAt || b.createdAt || 0) - new Date(a.dealAt || a.createdAt || 0));
 
@@ -1078,7 +1078,7 @@ function NegociosView({ companies, onOpenCompany, saveCompanies }) {
     else next.add(id);
     setSelectedIds(next);
   };
-  
+
   const toggleSelectAll = () => {
     if (selectedIds.size === sorted.length && sorted.length > 0) setSelectedIds(new Set());
     else setSelectedIds(new Set(sorted.map(c => c.id)));
@@ -1130,7 +1130,7 @@ function NegociosView({ companies, onOpenCompany, saveCompanies }) {
             const badgeBg = isGanho ? "#25D36620" : isPerdido ? "#F8717120" : "#38BDF820";
             const badgeColor = isGanho ? "#25D366" : isPerdido ? "#F87171" : "#38BDF8";
             const isSelected = selectedIds.has(c.id);
-            
+
             return (
               <div key={c.id} onClick={() => onOpenCompany(c.id)} style={{
                 display: "flex", alignItems: "center", gap: 12, background: isSelected ? "#1E293B" : "#0D1120", border: "1px solid #141A2B",
@@ -1936,22 +1936,22 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
                               background: "#0D1120", border: "1px solid #141A2B", borderLeft: `3px solid ${item.done ? "#22C55E" : ch.color}`,
                               borderRadius: 9, padding: "10px 12px", opacity: item.done ? 0.6 : 1, marginBottom: 4,
                             }}
-                            >
-                              {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
-                              <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
-                                <div style={{ fontSize: 10.5, color: statusColor }}>
-                                  {fmtDueDateTime(item)}
-                                </div>
+                          >
+                            {item.done ? <CheckCircle2 size={16} color="#22C55E" style={{ flexShrink: 0 }} /> : <Circle size={16} color="#334155" style={{ flexShrink: 0 }} />}
+                            <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#E2E8F0" }}>{item.activity.title}</div>
+                              <div style={{ fontSize: 10.5, color: statusColor }}>
+                                {fmtDueDateTime(item)}
                               </div>
-                              <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  }),
+                            <ChevronRight size={14} color="#334155" style={{ flexShrink: 0 }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }),
                 extras.length > 0 && (
                   <div key="extras">
                     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
@@ -2048,7 +2048,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
           onNext={() => setActiveIdx(i => Math.min(i + 1, agenda.length - 1))}
           onPrev={() => setActiveIdx(i => Math.max(i - 1, 0))}
           onToggleDone={() => toggleDone(activeItem)}
-          onOpenCompany={() => {}}
+          onOpenCompany={() => { }}
           hideOpenCompany
           onClose={() => setActiveIdx(null)}
           flows={flows}
@@ -2273,7 +2273,7 @@ function BulkActivityModal({ onClose, onSave, companies, flows }) {
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("09:00");
   const [selectedIds, setSelectedIds] = useState([]);
-  
+
   const [flowFilter, setFlowFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("");
 
@@ -2291,7 +2291,7 @@ function BulkActivityModal({ onClose, onSave, companies, flows }) {
   const toggleSelection = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
-  
+
   const selectAll = () => {
     if (selectedIds.length === filteredCompanies.length) {
       setSelectedIds([]); // deselect all
@@ -2373,7 +2373,7 @@ function BulkActivityModal({ onClose, onSave, companies, flows }) {
 
       <FieldLabel>Título da Atividade</FieldLabel>
       <TextInput value={title} onChange={setTitle} placeholder="Ex: Ligação de boas-vindas" />
-      
+
       <FieldLabel>Script / Notas (opcional)</FieldLabel>
       <textarea
         value={script}
@@ -2496,11 +2496,11 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies }) {
 
       {showNewFlow && <NewFlowModal onClose={() => setShowNewFlow(false)} onCreate={createFlow} />}
       {showBulkActivity && (
-        <BulkActivityModal 
-          onClose={() => setShowBulkActivity(false)} 
-          onSave={handleBulkActivitySave} 
-          companies={companies} 
-          flows={flows} 
+        <BulkActivityModal
+          onClose={() => setShowBulkActivity(false)}
+          onSave={handleBulkActivitySave}
+          companies={companies}
+          flows={flows}
         />
       )}
     </div>
@@ -2534,10 +2534,10 @@ function NewFlowModal({ onClose, onCreate }) {
     <ModalShell onClose={onClose} title="Novo fluxo">
       <FieldLabel>Nome do fluxo</FieldLabel>
       <TextInput value={name} onChange={setName} placeholder="Ex: Cadência Restaurantes" autoFocus />
-      
+
       <FieldLabel>Proprietário (Opcional)</FieldLabel>
       <TextInput value={owner} onChange={setOwner} placeholder="Ex: João, Maria..." />
-      
+
       <div style={{ marginTop: 16 }}>
         <FieldLabel>Etapas Padrão</FieldLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2686,39 +2686,39 @@ function FlowEditor({ flow, onUpdate, onDelete }) {
                   const realDate = calcDayDate(day);
                   const realDateStr = realDate ? realDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : null;
                   return (
-                  <div key={day}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: "#1E3A5F", background: "#0D1E2F", border: "1px solid #1E293B", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>DIA {day}</span>
-                      {realDateStr && (
-                        <span style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8" }}>{realDateStr}</span>
-                      )}
-                      <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
+                    <div key={day}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 5px" }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: "#1E3A5F", background: "#0D1E2F", border: "1px solid #1E293B", borderRadius: 5, padding: "2px 8px", letterSpacing: 0.5, flexShrink: 0 }}>DIA {day}</span>
+                        {realDateStr && (
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8" }}>{realDateStr}</span>
+                        )}
+                        <div style={{ flex: 1, height: 1, background: "#141A2B" }} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {sorted.filter(a => a.day === day).map(act => {
+                          const ch = CHANNELS[act.channel];
+                          const Icon = ch.Icon;
+                          return (
+                            <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 9, background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: "8px 10px" }}>
+                              <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: "#6366F1", background: "#1a1840", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>Dia {act.day}</span>
+                              {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{act.time}</span>}
+                              <button
+                                onClick={() => setActivityModal({ stageId: stage.id, activity: act })}
+                                title="Editar atividade"
+                                style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", display: "flex", padding: 2 }}
+                              ><Edit3 size={12} /></button>
+                              <button
+                                onClick={() => deleteActivity(stage.id, act.id)}
+                                title="Excluir atividade"
+                                style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", padding: 2 }}
+                              ><X size={12} /></button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {sorted.filter(a => a.day === day).map(act => {
-                        const ch = CHANNELS[act.channel];
-                        const Icon = ch.Icon;
-                        return (
-                          <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 9, background: "#070A12", border: "1px solid #141A2B", borderRadius: 8, padding: "8px 10px" }}>
-                            <Icon size={13} color={ch.color} style={{ flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: "#CBD5E1", flex: 1 }}>{act.title}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#6366F1", background: "#1a1840", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>Dia {act.day}</span>
-                            {act.time && <span style={{ fontSize: 10, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>{act.time}</span>}
-                            <button
-                              onClick={() => setActivityModal({ stageId: stage.id, activity: act })}
-                              title="Editar atividade"
-                              style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", display: "flex", padding: 2 }}
-                            ><Edit3 size={12} /></button>
-                            <button
-                              onClick={() => deleteActivity(stage.id, act.id)}
-                              title="Excluir atividade"
-                              style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", display: "flex", padding: 2 }}
-                            ><X size={12} /></button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
                   );
                 });
               })()}
