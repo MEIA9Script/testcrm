@@ -199,7 +199,7 @@ function ConfirmModal({ title, message, confirmLabel, confirmColor, isAlert, onC
    ROOT APP
    ============================================================ */
 
-export default function CRMApp({ initialView = "dashboard" }) {
+export default function CRMApp({ initialView = "dashboard", initialCompanyId = null }) {
   const router = useRouter();
   const { companies, flows, lossReasons, webhookConfig, loaded, error, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig, setError } = useCRMData();
   const { showConfirm, showAlert, ConfirmModalEl } = useConfirm();
@@ -259,12 +259,7 @@ export default function CRMApp({ initialView = "dashboard" }) {
 
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
 
-  const [activeCompanyId, setActiveCompanyId] = useState(() => {
-    if (typeof window !== "undefined") {
-      return new URLSearchParams(window.location.search).get("id") || null;
-    }
-    return null;
-  });
+  const [activeCompanyId, setActiveCompanyId] = useState(initialCompanyId);
 
   // Sincroniza a URL com a view ativa e armazena o estado no histórico do navegador
   useEffect(() => {
