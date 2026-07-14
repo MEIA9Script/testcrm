@@ -153,7 +153,13 @@ export default function CRMApp({ initialView = "dashboard" }) {
             triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo, ...webhookExtras });
           }
           if (oldCo.stageId !== nextCo.stageId && oldCo.status === nextCo.status) {
-            triggerWebhook(webhookConfig, 'on_stage_changed', { company: nextCo, ...webhookExtras });
+            const oldFlow = flows?.find(f => f.id === oldCo.flowId) || flows?.[0];
+            const oldStage = oldFlow?.stages?.find(s => s.id === oldCo.stageId);
+            triggerWebhook(webhookConfig, 'on_stage_changed', { 
+              company: nextCo, 
+              ...webhookExtras,
+              previousStageName: oldStage ? oldStage.name : null
+            });
           }
           const oldHist = oldCo.history || [];
           const nextHist = nextCo.history || [];

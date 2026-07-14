@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+function normalizePhone(phone) {
+  if (!phone) return "";
+  let p = String(phone).replace(/\D/g, "");
+  if (p.startsWith("55") && p.length > 11) {
+    p = p.substring(2);
+  }
+  return p;
+}
+
+function cleanString(str) {
+  if (!str) return "";
+  return String(str).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 export async function GET(request) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -25,7 +39,7 @@ export async function GET(request) {
 
     const { data, error: fetchError } = await supabase
       .from("crm_data")
-      .select("companies")
+      .select("companies, flows")
       .eq("id", 1)
       .single();
 
@@ -34,28 +48,52 @@ export async function GET(request) {
     }
 
     let companies = data.companies || [];
+    let flows = data.flows || [];
 
-    // Pegar parâmetros da URL para filtragem (ex: ?stageId=st1&status=ativo)
+    // Pegar parâmetros da URL para filtragem
     const { searchParams } = new URL(request.url);
     const stageId = searchParams.get("stageId");
     const status = searchParams.get("status");
     const flowId = searchParams.get("flowId");
+    const stageName = searchParams.get("stageName");
+    const flowName = searchParams.get("flowName");
+    const phoneParam = searchParams.get("phone");
 
-    let filteredLeads = companies;
+    // Enriquecer os leads com os nomes de etapa e funil primeiro
+    let enrichedLeads = companies.map(c => {
+      const flow = flows.find(f => f.id === c.flowId) || flows[0];
+      const stage = flow ? flow.stages?.find(s => s.id === c.stageId) : null;
+      return {
+        ...c,
+        flowName: flow ? flow.name : null,
+        stageName: stage ? stage.name : null
+      };
+    });
 
-    // Filtrar os leads de acordo com os parâmetros enviados
+    let filteredLeads = enrichedLeads;
+
+    if (status) {
+      filteredLeads = filteredLeads.filter(c => c.status === status);
+    }
     if (stageId) {
       filteredLeads = filteredLeads.filter(c => c.stageId === stageId);
-    }
-    if (status) {
-      // Ex: se o n8n pedir ?status=ativo, vai pegar tudo que seja 'ativo' (ou pode ser customizado pelo user)
-      filteredLeads = filteredLeads.filter(c => c.status === status);
     }
     if (flowId) {
       filteredLeads = filteredLeads.filter(c => c.flowId === flowId);
     }
+    if (stageName) {
+      const cleanSearchStage = cleanString(stageName);
+      filteredLeads = filteredLeads.filter(c => cleanString(c.stageName) === cleanSearchStage);
+    }
+    if (flowName) {
+      const cleanSearchFlow = cleanString(flowName);
+      filteredLeads = filteredLeads.filter(c => cleanString(c.flowName) === cleanSearchFlow);
+    }
+    if (phoneParam) {
+      const searchPhone = normalizePhone(phoneParam);
+      filteredLeads = filteredLeads.filter(c => normalizePhone(c.phone) === searchPhone);
+    }
 
-    // Retorna todos os dados úteis das empresas encontradas (incluindo stageStartDate)
     return NextResponse.json({ 
       success: true, 
       count: filteredLeads.length, 
