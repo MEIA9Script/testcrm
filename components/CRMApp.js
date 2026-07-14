@@ -138,21 +138,35 @@ export default function CRMApp({ initialView = "dashboard" }) {
     if (companies && nextCompanies && webhookConfig?.url) {
       for (const nextCo of nextCompanies) {
         const oldCo = companies.find(c => c.id === nextCo.id);
+        
+        const flow = flows?.find(f => f.id === nextCo.flowId) || flows?.[0];
+        const stage = flow?.stages?.find(s => s.id === nextCo.stageId);
+        const webhookExtras = {
+          stageName: stage ? stage.name : null,
+          flowName: flow ? flow.name : null
+        };
+
         if (!oldCo) {
-          triggerWebhook(webhookConfig, 'on_lead_created', { company: nextCo });
+          triggerWebhook(webhookConfig, 'on_lead_created', { company: nextCo, ...webhookExtras });
         } else {
           if (oldCo.status !== nextCo.status) {
-            triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo });
+            triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo, ...webhookExtras });
           }
           if (oldCo.stageId !== nextCo.stageId && oldCo.status === nextCo.status) {
-            triggerWebhook(webhookConfig, 'on_stage_changed', { company: nextCo });
+            triggerWebhook(webhookConfig, 'on_stage_changed', { company: nextCo, ...webhookExtras });
           }
           const oldHist = oldCo.history || [];
           const nextHist = nextCo.history || [];
           if (nextHist.length > oldHist.length) {
             const newAct = nextHist.find(h => !oldHist.some(o => o.id === h.id));
             if (newAct) {
-              triggerWebhook(webhookConfig, 'on_activity_done', { company: nextCo, activity: newAct });
+              const actStage = flow?.stages?.find(s => s.id === newAct.stageId) || stage;
+              triggerWebhook(webhookConfig, 'on_activity_done', { 
+                company: nextCo, 
+                activity: newAct,
+                stageName: actStage ? actStage.name : null,
+                flowName: webhookExtras.flowName
+              });
             }
           }
         }
