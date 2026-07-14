@@ -259,26 +259,35 @@ export default function CRMApp({ initialView = "dashboard" }) {
 
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
 
+  const [activeCompanyId, setActiveCompanyId] = useState(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("id") || null;
+    }
+    return null;
+  });
+
   // Sincroniza a URL com a view ativa e armazena o estado no histórico do navegador
   useEffect(() => {
     if (view && typeof window !== "undefined") {
-      window.history.pushState({ view }, '', '/' + view);
+      const url = view === "company" && activeCompanyId ? `/${view}?id=${activeCompanyId}` : `/${view}`;
+      window.history.pushState({ view, companyId: activeCompanyId }, '', url);
     }
-  }, [view]);
+  }, [view, activeCompanyId]);
 
   // Listener para o botão Voltar do navegador — sincroniza a view interna com o histórico
   useEffect(() => {
     const handlePopState = (event) => {
       if (event.state && event.state.view) {
         setView(event.state.view);
-        setActiveCompanyId(null);
+        setActiveCompanyId(event.state.companyId || null);
       } else {
         // Fallback: extrai a view da URL
         const path = window.location.pathname.replace('/', '') || 'dashboard';
-        const validViews = ['dashboard', 'list', 'kanban', 'flows', 'negocios', 'config'];
+        const params = new URLSearchParams(window.location.search);
+        const validViews = ['dashboard', 'list', 'kanban', 'flows', 'negocios', 'config', 'company'];
         if (validViews.includes(path)) {
           setView(path);
-          setActiveCompanyId(null);
+          setActiveCompanyId(params.get("id") || null);
         }
       }
     };
@@ -286,7 +295,6 @@ export default function CRMApp({ initialView = "dashboard" }) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const [activeCompanyId, setActiveCompanyId] = useState(null);
   const [showNewCompany, setShowNewCompany] = useState(false);
 
   useEffect(() => {
