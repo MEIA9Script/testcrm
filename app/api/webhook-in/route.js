@@ -183,9 +183,15 @@ export async function POST(request) {
     }
 
     if (action === "delete_activity") {
-      return NextResponse.json({ success: true, removedCount, company: targetCompany });
+      return NextResponse.json({ 
+        success: true, 
+        receivedAction: action,
+        receivedMatchTitle: matchTitle,
+        removedCount, 
+        company: targetCompany 
+      });
     }
-    return NextResponse.json({ success: true, company: targetCompany });
+    return NextResponse.json({ success: true, receivedAction: action, company: targetCompany });
 
   } catch (error) {
     console.error("Webhook In Error:", error);
