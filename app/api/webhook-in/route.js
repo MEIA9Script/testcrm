@@ -148,7 +148,7 @@ export async function POST(request) {
       if (stage && stage.activities) {
         for (const act of stage.activities) {
           if (act.title && act.title.toLowerCase().includes(matchTitleLower)) {
-            const existingLog = (targetCompany.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
+            const existingLog = (targetCompany.history || []).find(h => String(h.activityId) === String(act.id) && String(h.stageId) === String(stage.id));
             if (!existingLog) {
               targetCompany.history = targetCompany.history || [];
               targetCompany.history.push({

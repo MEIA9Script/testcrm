@@ -647,7 +647,7 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>
             Nexsite CRM
-            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.3</span>
+            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.4</span>
           </div>
           <div style={{ fontSize: 10.5, color: "#475569" }}>{companyCount} no funil ativo</div>
         </div>
@@ -714,11 +714,11 @@ function computeCompanyAgenda(company, flows) {
       const stageStart = company.stageStartDate ? new Date(company.stageStartDate + "T12:00:00") : new Date();
       for (const act of stage.activities) {
         if (company.status === "numero_incorreto" && act.channel === "whatsapp") continue;
-        const deletedLog = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id && h.type === "deleted");
+        const deletedLog = (company.history || []).find(h => String(h.activityId) === String(act.id) && String(h.stageId) === String(stage.id) && h.type === "deleted");
         if (deletedLog) continue; // Pula essa atividade pois foi excluída permanentemente via automação
 
         const dueDate = addBusinessDays(stageStart, act.day - 1);
-        const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
+        const log = (company.history || []).find(h => String(h.activityId) === String(act.id) && String(h.stageId) === String(stage.id) && h.type !== "deleted");
         items.push({
           activity: act,
           stage,
