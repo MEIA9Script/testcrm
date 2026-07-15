@@ -647,7 +647,7 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>
             Nexsite CRM
-            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.2</span>
+            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.3</span>
           </div>
           <div style={{ fontSize: 10.5, color: "#475569" }}>{companyCount} no funil ativo</div>
         </div>
@@ -714,6 +714,9 @@ function computeCompanyAgenda(company, flows) {
       const stageStart = company.stageStartDate ? new Date(company.stageStartDate + "T12:00:00") : new Date();
       for (const act of stage.activities) {
         if (company.status === "numero_incorreto" && act.channel === "whatsapp") continue;
+        const deletedLog = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id && h.type === "deleted");
+        if (deletedLog) continue; // Pula essa atividade pois foi excluída permanentemente via automação
+
         const dueDate = addBusinessDays(stageStart, act.day - 1);
         const log = (company.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
         items.push({
@@ -2120,7 +2123,9 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
     });
   };
 
-  const fullHistory = [...(company.history || [])].sort((a, b) => new Date(b.at) - new Date(a.at));
+  const fullHistory = [...(company.history || [])]
+    .filter(h => h.type !== "deleted")
+    .sort((a, b) => new Date(b.at) - new Date(a.at));
   const activeItem = activeIdx !== null ? agenda[activeIdx] : null;
   // "row" precisa do campo company pra reaproveitar o ActivityDetailDrawer
   const activeRow = activeItem ? { ...activeItem, company } : null;

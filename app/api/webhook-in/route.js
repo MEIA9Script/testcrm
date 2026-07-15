@@ -32,12 +32,12 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { action, companyId, phone, stageId, activity } = body;
+    const { action, companyId, phone, stageId, activity, matchTitle } = body;
 
     if (!action) {
       return NextResponse.json({ success: false, error: "Ação não especificada." }, { status: 400 });
     }
-    if (action !== "update_stage" && action !== "add_activity") {
+    if (action !== "update_stage" && action !== "add_activity" && action !== "delete_activity") {
       return NextResponse.json({ success: false, error: "Ação inválida." }, { status: 400 });
     }
     if (!companyId && !phone) {
@@ -48,6 +48,9 @@ export async function POST(request) {
     }
     if (action === "add_activity" && !activity) {
       return NextResponse.json({ success: false, error: "activity é obrigatório para add_activity." }, { status: 400 });
+    }
+    if (action === "delete_activity" && !matchTitle) {
+      return NextResponse.json({ success: false, error: "matchTitle é obrigatório para delete_activity." }, { status: 400 });
     }
 
     // Como os webhooks externos não têm sessão de usuário (não têm o cookie do CRM logado),
@@ -89,6 +92,8 @@ export async function POST(request) {
     // Copia do objeto pra fazer a alteração
     let targetCompany = { ...companies[targetIndex] };
 
+    let removedCount = 0;
+
     // Passo 3: Executar a ação
     if (action === "update_stage") {
       const oldStageId = targetCompany.stageId;
@@ -122,6 +127,44 @@ export async function POST(request) {
 
       const history = targetCompany.history || [];
       targetCompany.history = [...history, newActivity];
+    } else if (action === "delete_activity") {
+      const matchTitleLower = matchTitle.toLowerCase();
+
+      if (targetCompany.extraActivities) {
+        targetCompany.extraActivities = targetCompany.extraActivities.filter(a => {
+          if (a.title && a.title.toLowerCase().includes(matchTitleLower)) {
+            removedCount++;
+            return false;
+          }
+          return true;
+        });
+      }
+
+      const { data: flowsData } = await supabase.from("crm_data").select("flows").eq("id", 1).maybeSingle();
+      const flows = flowsData?.flows || [];
+      const flow = flows.find(f => f.id === targetCompany.flowId);
+      const stage = flow?.stages?.find(s => s.id === targetCompany.stageId);
+
+      if (stage && stage.activities) {
+        for (const act of stage.activities) {
+          if (act.title && act.title.toLowerCase().includes(matchTitleLower)) {
+            const existingLog = (targetCompany.history || []).find(h => h.activityId === act.id && h.stageId === stage.id);
+            if (!existingLog) {
+              targetCompany.history = targetCompany.history || [];
+              targetCompany.history.push({
+                id: `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                activityId: act.id,
+                stageId: stage.id,
+                type: "deleted",
+                title: "Deletada",
+                channel: "system",
+                at: new Date().toISOString()
+              });
+              removedCount++;
+            }
+          }
+        }
+      }
     }
 
     // Passo 4: Salvar no array
@@ -139,6 +182,9 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: "Erro ao salvar alterações no Supabase." }, { status: 500 });
     }
 
+    if (action === "delete_activity") {
+      return NextResponse.json({ success: true, removedCount, company: targetCompany });
+    }
     return NextResponse.json({ success: true, company: targetCompany });
 
   } catch (error) {
