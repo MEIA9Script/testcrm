@@ -6,7 +6,7 @@ import {
   LayoutGrid, List, Settings, ArrowLeft, Check, Clock, Building2,
   Trash2, Edit3, GripVertical, CheckCircle2, Circle, AlertCircle,
   Sparkles, Search, Trophy, ThumbsDown, Upload, Download, FileSpreadsheet,
-  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap
+  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap, Activity
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useCRMData } from "../lib/useCRMData";
