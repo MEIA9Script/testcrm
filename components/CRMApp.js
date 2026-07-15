@@ -638,7 +638,10 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ background: "linear-gradient(135deg, #818CF8, #38BDF8)", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: "#fff", flexShrink: 0 }}>N</div>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px" }}>Nexsite CRM</div>
+          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>
+            Nexsite CRM
+            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.0</span>
+          </div>
           <div style={{ fontSize: 10.5, color: "#475569" }}>{companyCount} no funil ativo</div>
         </div>
       </div>
