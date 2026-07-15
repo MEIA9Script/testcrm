@@ -91,8 +91,25 @@ export async function POST(request) {
 
     // Passo 3: Executar a ação
     if (action === "update_stage") {
+      const oldStageId = targetCompany.stageId;
       targetCompany.stageId = stageId;
       targetCompany.stageStartDate = new Date().toISOString().slice(0, 10);
+      
+      const { data: flowsData } = await supabase.from("crm_data").select("flows").eq("id", 1).maybeSingle();
+      const flows = flowsData?.flows || [];
+      const flow = flows.find(f => f.id === targetCompany.flowId);
+      const oldStageName = flow?.stages?.find(s => s.id === oldStageId)?.name || "Desconhecida";
+      const newStageName = flow?.stages?.find(s => s.id === stageId)?.name || "Desconhecida";
+      
+      targetCompany.history = targetCompany.history || [];
+      targetCompany.history.push({ 
+        id: `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, 
+        type: "auto", 
+        title: `Movido via API: ${oldStageName} → ${newStageName}`, 
+        at: new Date().toISOString(), 
+        channel: "system" 
+      });
+
     } else if (action === "add_activity") {
       const newActivity = {
         id: activity.id || `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,

@@ -23,6 +23,8 @@ const CHANNELS = {
   whatsapp: { label: "WhatsApp", color: "#25D366", bg: "#052e16", Icon: MessageCircle },
   ligacao: { label: "Ligação", color: "#818CF8", bg: "#1e1b4b", Icon: Phone },
   email: { label: "E-mail", color: "#FB923C", bg: "#1c0f05", Icon: Mail },
+  ext: { label: "Externo", color: "#F472B6", bg: "#381729", Icon: Activity },
+  system: { label: "Sistema", color: "#94A3B8", bg: "#0F172A", Icon: Activity },
 };
 
 const STAGE_COLORS = ["#818CF8", "#38BDF8", "#25D366", "#FB923C", "#F472B6", "#FBBF24", "#A78BFA"];
@@ -196,6 +198,50 @@ function ConfirmModal({ title, message, confirmLabel, confirmColor, isAlert, onC
 }
 
 /* ============================================================
+   TOAST NOTIFICATIONS
+   ============================================================ */
+
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = useCallback((message, type = "success") => {
+    const id = uid("toast");
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const ToastContainerEl = toasts.length > 0 ? (
+    <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 10, zIndex: 9999 }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          background: t.type === "error" ? "#7C2D12" : "#064E3B",
+          color: t.type === "error" ? "#FED7AA" : "#A7F3D0",
+          border: `1px solid ${t.type === "error" ? "#B91C1C" : "#059669"}`,
+          padding: "12px 18px",
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 600,
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
+          animation: "slideIn 0.3s ease-out forwards",
+        }}>
+          {t.type === "error" ? "❌ " : "✅ "}{t.message}
+        </div>
+      ))}
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  ) : null;
+
+  return { addToast, ToastContainerEl };
+}
+
+/* ============================================================
    ROOT APP
    ============================================================ */
 
@@ -203,15 +249,10 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
   const router = useRouter();
   const { companies, flows, lossReasons, webhookConfig, loaded, error, saveCompanies, saveFlows, saveLossReasons, saveWebhookConfig, setError } = useCRMData();
   const { showConfirm, showAlert, ConfirmModalEl } = useConfirm();
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  };
+  const { addToast, ToastContainerEl } = useToast();
 
-  const handleSaveCompanies = async (nextCompanies) => {
-    if (companies && nextCompanies && webhookConfig?.url) {
+  const handleSaveCompanies = async (nextCompanies, successMsg, errMsg) => {
+    if (companies && nextCompanies) {
       for (const nextCo of nextCompanies) {
         const oldCo = companies.find(c => c.id === nextCo.id);
 
@@ -222,39 +263,85 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           flowName: flow ? flow.name : null
         };
 
+        // --- 1. HISTÓRICO AUTOMÁTICO ---
         if (!oldCo) {
-          triggerWebhook(webhookConfig, 'on_lead_created', { company: nextCo, ...webhookExtras });
+          nextCo.history = nextCo.history || [];
+          nextCo.history.push({ id: uid("h"), type: "auto", title: "Empresa criada", at: new Date().toISOString(), channel: "system" });
+          if (webhookConfig?.url) triggerWebhook(webhookConfig, 'on_lead_created', { company: nextCo, ...webhookExtras });
         } else {
+          let stageChanged = false;
+          let statusChanged = false;
+
+          if (oldCo.stageId !== nextCo.stageId) {
+            stageChanged = true;
+            const oldStage = flow?.stages?.find(s => s.id === oldCo.stageId)?.name || "Desconhecida";
+            const newStage = stage?.name || "Desconhecida";
+            nextCo.history = nextCo.history || [];
+            nextCo.history.push({ id: uid("h"), type: "auto", title: `Movido de etapa: ${oldStage} → ${newStage}`, at: new Date().toISOString(), channel: "system" });
+          }
           if (oldCo.status !== nextCo.status) {
-            triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo, ...webhookExtras });
+            statusChanged = true;
+            let statusText = nextCo.status === "ativo" ? "Reativado" : nextCo.status === "ganho" ? "Ganho" : nextCo.status === "perdido" ? "Perdido" : nextCo.status;
+            nextCo.history = nextCo.history || [];
+            nextCo.history.push({ id: uid("h"), type: "auto", title: `Status alterado: ${statusText}`, at: new Date().toISOString(), channel: "system" });
           }
-          if (oldCo.stageId !== nextCo.stageId && oldCo.status === nextCo.status) {
-            const oldFlow = flows?.find(f => f.id === oldCo.flowId) || flows?.[0];
-            const oldStage = oldFlow?.stages?.find(s => s.id === oldCo.stageId);
-            triggerWebhook(webhookConfig, 'on_stage_changed', {
-              company: nextCo,
-              ...webhookExtras,
-              previousStageName: oldStage ? oldStage.name : null
-            });
-          }
-          const oldHist = oldCo.history || [];
-          const nextHist = nextCo.history || [];
-          if (nextHist.length > oldHist.length) {
-            const newAct = nextHist.find(h => !oldHist.some(o => o.id === h.id));
-            if (newAct) {
-              const actStage = flow?.stages?.find(s => s.id === newAct.stageId) || stage;
-              triggerWebhook(webhookConfig, 'on_activity_done', {
+
+          // --- 2. WEBHOOK OUT ---
+          if (webhookConfig?.url) {
+            if (statusChanged) {
+              triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo, ...webhookExtras });
+            }
+            if (stageChanged && !statusChanged) {
+              const oldStage = flow?.stages?.find(s => s.id === oldCo.stageId);
+              triggerWebhook(webhookConfig, 'on_stage_changed', {
                 company: nextCo,
-                activity: newAct,
-                stageName: actStage ? actStage.name : null,
-                flowName: webhookExtras.flowName
+                ...webhookExtras,
+                previousStageName: oldStage ? oldStage.name : null
               });
+            }
+            const oldHist = oldCo.history || [];
+            const nextHist = nextCo.history || [];
+            if (nextHist.length > oldHist.length) {
+              // Somente webhooks para atividades manuais (não type: auto)
+              const newActs = nextHist.filter(h => !oldHist.some(o => o.id === h.id) && h.type !== "auto");
+              for (const newAct of newActs) {
+                const actStage = flow?.stages?.find(s => s.id === newAct.stageId) || stage;
+                triggerWebhook(webhookConfig, 'on_activity_done', {
+                  company: nextCo,
+                  activity: newAct,
+                  stageName: actStage ? actStage.name : null,
+                  flowName: webhookExtras.flowName
+                });
+              }
             }
           }
         }
       }
     }
-    await saveCompanies(nextCompanies);
+    const res = await saveCompanies(nextCompanies);
+    if (res?.success === false) {
+      addToast(errMsg || "Erro ao salvar dados, tente novamente.", "error");
+    } else if (successMsg) {
+      addToast(successMsg, "success");
+    }
+  };
+
+  const handleSaveFlows = async (nextFlows, successMsg, errMsg) => {
+    const res = await saveFlows(nextFlows);
+    if (res?.success === false) {
+      addToast(errMsg || "Erro ao salvar fluxo, tente novamente.", "error");
+    } else if (successMsg) {
+      addToast(successMsg, "success");
+    }
+  };
+
+  const handleSaveLossReasons = async (nextReasons, successMsg) => {
+    const res = await saveLossReasons(nextReasons);
+    if (res?.success === false) {
+      addToast("Erro ao salvar motivos de perda.", "error");
+    } else if (successMsg) {
+      addToast(successMsg, "success");
+    }
   };
 
   const [view, setView] = useState(initialView); // dashboard | list | kanban | flows | negocios | config | company
@@ -291,6 +378,18 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
   }, []);
 
   const [showNewCompany, setShowNewCompany] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!loaded || flows.length === 0 || companies.length === 0) return;
@@ -344,8 +443,8 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
         }),
       })),
     }));
-    if (hasChanges) saveFlows(nextFlows);
-  }, [loaded, flows, saveFlows]);
+    if (hasChanges) handleSaveFlows(nextFlows, null, "Erro ao normalizar atividades.");
+  }, [loaded, flows, handleSaveFlows]);
 
   if (!loaded) {
     return (
@@ -379,7 +478,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
         </div>
       )}
 
-      <TopBar view={view} setView={setView} onNewCompany={() => setShowNewCompany(true)} companyCount={pipelineCompanies.length} onLogout={handleLogout} />
+      <TopBar view={view} setView={setView} onNewCompany={() => setShowNewCompany(true)} onSearch={() => setShowSearch(true)} companyCount={pipelineCompanies.length} onLogout={handleLogout} />
 
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px" }}>
         {view === "dashboard" && (
@@ -392,7 +491,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           <KanbanView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
         )}
         {view === "flows" && (
-          <FlowsView flows={flows} saveFlows={saveFlows} companies={companies} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} showAlert={showAlert} />
+          <FlowsView flows={flows} saveFlows={handleSaveFlows} companies={companies} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} showAlert={showAlert} />
         )}
         {view === "negocios" && (
           <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
@@ -400,7 +499,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
         {view === "config" && (
           <ConfigView
             companies={companies} flows={flows} lossReasons={lossReasons} webhookConfig={webhookConfig}
-            saveCompanies={handleSaveCompanies} saveFlows={saveFlows} saveLossReasons={saveLossReasons} saveWebhookConfig={saveWebhookConfig}
+            saveCompanies={handleSaveCompanies} saveFlows={handleSaveFlows} saveLossReasons={handleSaveLossReasons} saveWebhookConfig={saveWebhookConfig}
             showConfirm={showConfirm}
           />
         )}
@@ -411,7 +510,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
             companies={companies}
             lossReasons={lossReasons}
             saveCompanies={handleSaveCompanies}
-            saveFlows={saveFlows}
+            saveFlows={handleSaveFlows}
             onBack={() => { setView("list"); setActiveCompanyId(null); }}
             showConfirm={showConfirm}
           />
@@ -426,7 +525,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           flows={flows}
           onClose={() => setShowNewCompany(false)}
           onCreate={async (newCo) => {
-            await handleSaveCompanies([...companies, newCo]);
+            await handleSaveCompanies([...companies, newCo], "Empresa criada");
             setShowNewCompany(false);
             setActiveCompanyId(newCo.id);
             setView("company");
@@ -434,7 +533,89 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
         />
       )}
 
+      {showSearch && (
+        <GlobalSearchModal 
+          companies={companies} 
+          onClose={() => setShowSearch(false)} 
+          onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} 
+        />
+      )}
+
       {ConfirmModalEl}
+      {ToastContainerEl}
+    </div>
+  );
+}
+
+/* ============================================================
+   GLOBAL SEARCH MODAL
+   ============================================================ */
+
+function GlobalSearchModal({ companies, onClose, onOpenCompany }) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const norm = str => String(str).replace(/\D/g, "");
+  const lowerQuery = query.toLowerCase().trim();
+  const numQuery = norm(query);
+
+  const results = lowerQuery ? companies.filter(c => 
+    (c.name && c.name.toLowerCase().includes(lowerQuery)) ||
+    (c.email && c.email.toLowerCase().includes(lowerQuery)) ||
+    (c.decisor && c.decisor.toLowerCase().includes(lowerQuery)) ||
+    (numQuery.length > 2 && c.phone && norm(c.phone).includes(numQuery))
+  ) : [];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: "10vh", zIndex: 99999 }} onClick={onClose}>
+      <div style={{ width: "100%", maxWidth: 600, background: "#0F172A", borderRadius: 12, border: "1px solid #1E293B", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)", display: "flex", flexDirection: "column", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #1E293B", display: "flex", alignItems: "center", gap: 12 }}>
+          <Search size={18} color="#94A3B8" />
+          <input 
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar por nome, telefone, e-mail ou contato..."
+            style={{ flex: 1, background: "transparent", border: "none", color: "#F8FAFC", fontSize: 16, outline: "none", fontFamily: "inherit" }}
+          />
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#64748B", cursor: "pointer", fontSize: 12, fontWeight: 700, padding: "4px 8px", borderRadius: 6, backgroundColor: "#1E293B" }}>ESC</button>
+        </div>
+        <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+          {query.trim() === "" ? (
+            <div style={{ padding: 30, textAlign: "center", color: "#64748B", fontSize: 13 }}>Digite algo para começar a buscar...</div>
+          ) : results.length === 0 ? (
+            <div style={{ padding: 30, textAlign: "center", color: "#64748B", fontSize: 13 }}>Nenhum resultado encontrado para "{query}"</div>
+          ) : (
+            results.map(c => (
+              <div 
+                key={c.id} 
+                onClick={() => { onOpenCompany(c.id); onClose(); }}
+                style={{ padding: "12px 20px", borderBottom: "1px solid #1E293B", display: "flex", flexDirection: "column", gap: 4, cursor: "pointer", transition: "background 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#1E293B"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0" }}>{c.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: c.status === "ganho" ? "#22C55E" : c.status === "perdido" ? "#EF4444" : "#38BDF8", textTransform: "uppercase" }}>{c.status}</div>
+                </div>
+                <div style={{ fontSize: 12, color: "#94A3B8", display: "flex", gap: 12 }}>
+                  {c.phone && <span>📞 {c.phone}</span>}
+                  {c.decisor && <span>👤 {c.decisor}</span>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -443,7 +624,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
    TOP BAR
    ============================================================ */
 
-function TopBar({ view, setView, onNewCompany, companyCount, onLogout }) {
+function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout }) {
   const tabs = [
     { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
     { key: "list", label: "Atividades", Icon: List },
@@ -483,6 +664,12 @@ function TopBar({ view, setView, onNewCompany, companyCount, onLogout }) {
             );
           })}
         </div>
+        <button
+          onClick={onSearch}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#1E293B", border: "1px solid #334155", borderRadius: 9, padding: "9px 12px", color: "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+        >
+          <Search size={14} /> Buscar <span style={{ fontSize: 10, background: "#0F172A", padding: "2px 5px", borderRadius: 4, marginLeft: 4 }}>Ctrl+K</span>
+        </button>
         <button
           onClick={onNewCompany}
           style={{ display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #6366F1, #38BDF8)", border: "none", borderRadius: 9, padding: "9px 14px", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}
@@ -1868,9 +2055,9 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   const agenda = useMemo(() => computeCompanyAgenda(company, flows), [company, flows]);
   const stageIdx = flow ? flow.stages.findIndex(s => s.id === company.stageId) : -1;
 
-  const update = async (patch) => {
+  const update = async (patch, msg) => {
     const next = companies.map(c => c.id === company.id ? { ...c, ...patch } : c);
-    await saveCompanies(next);
+    await saveCompanies(next, msg);
   };
 
   const toggleDone = async (item) => {
@@ -1886,7 +2073,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
 
   const moveToStageConfirm = async (startDate) => {
     if (!flow || !moveToStage) return;
-    await update({ stageId: moveToStage.id, stageStartDate: startDate || todayISO() });
+    await update({ stageId: moveToStage.id, stageStartDate: startDate || todayISO() }, `Lead movido para ${moveToStage.name}`);
     setMoveToStage(null);
   };
 
@@ -1907,7 +2094,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
   const deleteCompany = async () => {
     const confirmed = await showConfirm({ title: "Excluir empresa", message: `Excluir "${company.name}"? Essa ação não pode ser desfeita.`, confirmLabel: "Excluir", confirmColor: "#F87171" });
     if (!confirmed) return;
-    await saveCompanies(companies.filter(c => c.id !== company.id));
+    await saveCompanies(companies.filter(c => c.id !== company.id), "Empresa excluída");
     onBack();
   };
 
@@ -2165,7 +2352,7 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
       </div>
 
       {editing && (
-        <EditCompanyModal company={company} flows={flows} onClose={() => setEditing(false)} onSave={async (patch) => { await update(patch); setEditing(false); }} />
+        <EditCompanyModal company={company} flows={flows} onClose={() => setEditing(false)} onSave={async (patch) => { await update(patch, "Dados salvos"); setEditing(false); }} />
       )}
 
       {addingActivity && <ExtraActivityModal onClose={() => setAddingActivity(false)} onSave={addExtraActivity} />}
