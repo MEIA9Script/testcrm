@@ -251,6 +251,13 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
   const { showConfirm, showAlert, ConfirmModalEl } = useConfirm();
   const { addToast, ToastContainerEl } = useToast();
 
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
   const handleSaveCompanies = async (nextCompanies, successMsg, errMsg) => {
     if (companies && nextCompanies) {
       for (const nextCo of nextCompanies) {
