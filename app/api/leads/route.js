@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const dynamic = 'force-dynamic';
+
 function normalizePhone(phone) {
   if (!phone) return "";
   let p = String(phone).replace(/\D/g, "");
