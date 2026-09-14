@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Phone, MessageCircle, Mail, Plus, X, ChevronDown, ChevronRight,
-  LayoutGrid, List, Settings, ArrowLeft, Check, Clock, Building2,
-  Trash2, Edit3, GripVertical, CheckCircle2, Circle, AlertCircle,
+  LayoutGrid, List, ArrowLeft, Check, Clock, Building2,
+  Trash2, Edit3, CheckCircle2, Circle, AlertCircle,
   Sparkles, Search, Trophy, ThumbsDown, Upload, Download, FileSpreadsheet,
   LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap, Activity
 } from "lucide-react";
@@ -647,7 +647,7 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>
             Nexsite CRM
-            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.4</span>
+            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.5</span>
           </div>
           <div style={{ fontSize: 10.5, color: "#475569" }}>{companyCount} no funil ativo</div>
         </div>
@@ -764,6 +764,12 @@ function addBusinessDays(date, days) {
 
 function fmtDate(d) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+// "2026-09-15" -> "15/09/2026" (meio-dia pra nao escorregar de fuso)
+function dataBR(iso) {
+  if (!iso) return "";
+  return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
 function isSameDay(a, b) {
@@ -2795,6 +2801,20 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies, showConfirm, sh
     await saveFlows(flows.map(f => f.id === activeFlow.id ? { ...f, ...patch } : f));
   };
 
+  // O "Dia 1 =" do editor era so uma previa na tela. Aqui ele passa a valer de
+  // verdade: reagenda as atividades dos leads DESSE fluxo a partir da data.
+  const aplicarDiaUm = async (data) => {
+    if (!activeFlow || !data) return 0;
+    const alvos = companies.filter(c => c.flowId === activeFlow.id);
+    if (!alvos.length) {
+      await showAlert({ title: "Nenhum lead nesse fluxo", message: `Não há lead nesse fluxo pra reagendar. A data continua valendo só como prévia aqui na tela.` });
+      return 0;
+    }
+    await saveCompanies(companies.map(c => c.flowId === activeFlow.id ? { ...c, stageStartDate: data } : c));
+    await showAlert({ title: "Dia 1 atualizado", message: `${alvos.length} lead(s) do fluxo "${activeFlow.name}" passaram a contar o Dia 1 a partir de ${dataBR(data)}.` });
+    return alvos.length;
+  };
+
   const handleBulkActivitySave = async (activityData, companyIds) => {
     const nextCompanies = companies.map(c => {
       if (companyIds.includes(c.id)) {
@@ -2839,7 +2859,14 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies, showConfirm, sh
       )}
 
       {activeFlow && (
-        <FlowEditor flow={activeFlow} onUpdate={updateFlow} onDelete={() => deleteFlow(activeFlow.id)} showConfirm={showConfirm} />
+        <FlowEditor
+          flow={activeFlow}
+          onUpdate={updateFlow}
+          onDelete={() => deleteFlow(activeFlow.id)}
+          showConfirm={showConfirm}
+          leadsNoFluxo={companies.filter(c => c.flowId === activeFlow.id).length}
+          onAplicarDiaUm={aplicarDiaUm}
+        />
       )}
 
       {showNewFlow && <NewFlowModal onClose={() => setShowNewFlow(false)} onCreate={createFlow} />}
@@ -2926,13 +2953,14 @@ function NewFlowModal({ onClose, onCreate }) {
   );
 }
 
-function FlowEditor({ flow, onUpdate, onDelete, showConfirm }) {
+function FlowEditor({ flow, onUpdate, onDelete, showConfirm, leadsNoFluxo = 0, onAplicarDiaUm }) {
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(flow.name);
   const [ownerInput, setOwnerInput] = useState(flow.owner || "");
   const [activityModal, setActivityModal] = useState(null); // { stageId, activity? }
   const [stageModal, setStageModal] = useState(false);
   const [previewDate, setPreviewDate] = useState(todayISO()); // data de referência para visualizar datas reais
+  const [dataPendente, setDataPendente] = useState(null); // data escolhida esperando ele dizer se aplica nos leads
 
   // Calcula a data real de um dia da cadência
   const calcDayDate = (day) => {
@@ -2976,6 +3004,12 @@ function FlowEditor({ flow, onUpdate, onDelete, showConfirm }) {
     setActivityModal(null);
   };
 
+  const aplicarDataNosLeads = async () => {
+    const data = dataPendente;
+    setDataPendente(null);
+    if (onAplicarDiaUm) await onAplicarDiaUm(data);
+  };
+
   const deleteActivity = async (stageId, activityId) => {
     const stage = flow.stages.find(s => s.id === stageId);
     await onUpdate({ stages: flow.stages.map(s => s.id === stageId ? { ...s, activities: stage.activities.filter(a => a.id !== activityId) } : s) });
@@ -3004,7 +3038,7 @@ function FlowEditor({ flow, onUpdate, onDelete, showConfirm }) {
             <input
               type="date"
               value={previewDate}
-              onChange={e => setPreviewDate(e.target.value)}
+              onChange={e => { setPreviewDate(e.target.value); setDataPendente(e.target.value || null); }}
               style={{ background: "transparent", border: "none", color: "#38BDF8", fontSize: 12, fontWeight: 700, outline: "none", cursor: "pointer" }}
             />
           </div>
@@ -3013,6 +3047,21 @@ function FlowEditor({ flow, onUpdate, onDelete, showConfirm }) {
           </button>
         </div>
       </div>
+
+      {dataPendente && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "#0D1120", border: "1px solid #38BDF840", borderRadius: 11, padding: "11px 14px", marginBottom: 14 }}>
+          <span style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>
+            Contar o Dia 1 de <b style={{ color: "#F1F5F9" }}>{flow.name}</b> a partir de <b style={{ color: "#38BDF8" }}>{dataBR(dataPendente)}</b> também no Kanban?
+            {leadsNoFluxo > 0
+              ? ` Isso reagenda as atividades de ${leadsNoFluxo} lead(s) que já estão nesse fluxo.`
+              : " Nenhum lead está nesse fluxo agora, então nada muda no Kanban."}
+          </span>
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+            <button onClick={aplicarDataNosLeads} style={smallBtnStyle("#25C99E")}>Aplicar agora</button>
+            <button onClick={() => setDataPendente(null)} style={smallBtnStyle("#475569")}>Só na prévia</button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {flow.stages.map((stage, idx) => (
