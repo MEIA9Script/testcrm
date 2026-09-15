@@ -37,34 +37,60 @@ const DEFAULT_LOSS_REASONS = [
   "Fechou com concorrente",
 ];
 
+// Nas etapas de contato o Iuri liga 3 vezes por dia, durante 5 dias. Se nao
+// falar com a pessoa nesses 5 dias o lead vira perdido; se falar, ele pula pra
+// etapa seguinte. Mudou o horario de ligacao? Mexe so nessa lista.
+const HORARIOS_LIGACAO = ["08:00", "12:00", "16:50"];
+
+function ligacoesDeCincoDias(prefixo, roteiroPorDia) {
+  const lista = [];
+  for (let dia = 1; dia <= 5; dia++) {
+    HORARIOS_LIGACAO.forEach((hora, i) => {
+      lista.push({
+        id: `${prefixo}${dia}${"abc"[i]}`,
+        day: dia,
+        time: hora,
+        channel: "ligacao",
+        title: `Ligação dia ${dia} · ${hora}`,
+        script: roteiroPorDia[dia - 1],
+      });
+    });
+  }
+  return lista;
+}
+
+const SCRIPT_CONTATO_REALIZADO = [
+  "Apresentação. \"Oi, tudo bem? Sou o [nome] da Nexsite. Vocês têm site hoje?\" Objetivo do dia 1: descobrir quem atendeu e se essa pessoa decide.",
+  "Reforça a dor. \"Cliente pesquisa no Google, não acha vocês, e vai pro concorrente.\" Se pedir pra ligar depois, anota o horário e respeita.",
+  "Muda o ângulo. Pergunta qual o melhor horário pra falar e quem cuida do marketing. Não empurra proposta ainda.",
+  "Penúltima tentativa. Avisa que vai parar de ligar: \"não quero incomodar, só não queria deixar vocês de fora disso\".",
+  "Última tentativa. Se não falar com ninguém hoje, marca o lead como perdido. Se falar, avança pra Contato com Decisor.",
+];
+
+const SCRIPT_CONTATO_DECISOR = [
+  "Confirma quem decide. \"Você é quem decide sobre o marketing da empresa, ou tem outra pessoa?\" Anota nome, cargo e melhor horário.",
+  "Insiste pra chegar no decisor. Se for secretária ou funcionário, pede o nome do responsável e o melhor horário pra encontrar ele.",
+  "Valida a dor com quem decide. \"Empresa sem site é loja sem placa: o cliente passa na frente e não sabe que vocês existem.\"",
+  "Prova. Cita um cliente parecido da região e o resultado concreto que ele teve depois do site.",
+  "Fecha o dia 5. Ou marca a reunião, ou combina o envio do material. Se não falar com o decisor, o lead vira perdido.",
+];
+
 const SAMPLE_FLOW = {
   id: "flow_sample",
   name: "Cadência Padrão Nexsite",
   stages: [
     {
       id: "st1", name: "Entrada de Leads", color: "#818CF8",
-      activities: [
-        { id: "a1", day: 1, time: "08:00", channel: "whatsapp", title: "Primeira mensagem", script: "Olá, aqui é a [empresa]? 👋\nAguarda resposta antes de enviar qualquer outra coisa." },
-        { id: "a2", day: 1, time: "09:00", channel: "whatsapp", title: "Após resposta segunda mensagem", script: "Oi! Sou o [nome], da Nexsite — criamos sites e landing pages para empresas aqui da região. Vi que vocês ainda não têm um site (ou o de vocês pode estar deixando cliente ir embora). Posso te mostrar o que fazemos em 2 minutinhos?\nDor: empresa sem site perde credibilidade e vendas todo dia." },
-      ],
+      // etapa de espera: o lead so fica parado aqui ate entrar na cadencia
+      activities: [],
     },
     {
       id: "st2", name: "Contato Realizado", color: "#38BDF8",
-      activities: [
-        { id: "b1", day: 1, time: "09:00", channel: "ligacao", title: "Ligação — tentativa manhã", script: "Oi, tudo bem? Sou o [nome] da Nexsite. Mandei mensagem no WhatsApp — vocês têm site? Muita empresa aqui perde cliente pra concorrente só porque não aparece no Google.\nObjetivo: confirmar quem atendeu e checar se é o decisor." },
-        { id: "b2", day: 1, time: "12:30", channel: "ligacao", title: "Ligação — tentativa almoço", script: "Boa tarde! Aqui é o [nome] da Nexsite. Tentei mais cedo mas não consegui — tem um minutinho pra conversar agora?" },
-        { id: "b3", day: 2, time: "09:00", channel: "ligacao", title: "Ligação — dia 2 sem resposta", script: "Tentativa 2. Mesma abordagem, reforça a dor: \"cliente pesquisa no Google, não te acha, vai pro concorrente.\"" },
-        { id: "b4", day: 3, time: "08:00", channel: "email", title: "E-mail fallback", script: "Assunto: Sua empresa aparece no Google?\n\nCorpo curto: apresentação em 3 linhas + link do portfólio + convite pra conversa.\nDispara após 2–3 tentativas sem resposta na ligação." },
-      ],
+      activities: ligacoesDeCincoDias("b", SCRIPT_CONTATO_REALIZADO),
     },
     {
       id: "st3", name: "Contato com Decisor", color: "#25D366",
-      activities: [
-        { id: "c1", day: 1, time: "09:00", channel: "ligacao", title: "Qualificação — manhã", script: "\"Você é o responsável pelas decisões da empresa? Ou tem alguém que eu possa falar sobre o marketing de vocês?\" — Confirmar nome, cargo e melhor horário.\nNão avança sem falar com quem decide." },
-        { id: "c2", day: 1, time: "12:30", channel: "ligacao", title: "Qualificação — almoço", script: "Segunda tentativa do dia para falar com o decisor. Mesma abordagem." },
-        { id: "c3", day: 1, time: "10:00", channel: "whatsapp", title: "Validação de dor após confirmar decisor", script: "Oi [nome]! Empresa sem site hoje é como ter uma loja sem placa — o cliente passa na frente e não sabe que vocês existem. Posso te mostrar o que fizemos pra empresas parecidas com a de vocês?" },
-        { id: "c4", day: 2, time: "08:00", channel: "email", title: "Caso de sucesso se pedir mais info", script: "Envia exemplo de cliente similar com resultado concreto (ex: \"empresa de Sorriso que passou a receber contatos pelo Google após o site\")." },
-      ],
+      activities: ligacoesDeCincoDias("c", SCRIPT_CONTATO_DECISOR),
     },
     {
       id: "st4", name: "Entrega de Material", color: "#F59E0B",
@@ -647,7 +673,7 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>
             Nexsite CRM
-            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.5</span>
+            <span style={{ fontSize: 9, background: "#1E293B", color: "#94A3B8", padding: "2px 6px", borderRadius: 4, letterSpacing: "normal" }}>v1.2.6</span>
           </div>
           <div style={{ fontSize: 10.5, color: "#475569" }}>{companyCount} no funil ativo</div>
         </div>
@@ -2779,10 +2805,33 @@ function FlowsView({ flows, saveFlows, companies, saveCompanies, showConfirm, sh
     setShowNewFlow(false);
   };
 
+  // Troca so as atividades de cada etapa pelo roteiro padrao. Mantem id, nome e
+  // cor da etapa, que e o que prende os leads no lugar certo do Kanban.
+  const comRoteiroPadrao = (destino) => ({
+    ...destino,
+    stages: destino.stages.map(stage => {
+      const modelo = SAMPLE_FLOW.stages.find(s => s.id === stage.id)
+        || SAMPLE_FLOW.stages.find(s => s.name.trim().toLowerCase() === stage.name.trim().toLowerCase());
+      return modelo ? { ...stage, activities: modelo.activities } : stage;
+    }),
+  });
+
   const loadSample = async () => {
-    const exists = flows.some(f => f.id === SAMPLE_FLOW.id);
-    if (exists) { setActiveFlowId(SAMPLE_FLOW.id); return; }
-    const clone = { ...SAMPLE_FLOW, id: uid("flow") };
+    // o clone antigo nascia com id novo, entao essa conferencia nunca batia e o
+    // botao criava um fluxo repetido a cada clique
+    const existente = flows.find(f => f.origem === "sample" || f.name.trim() === SAMPLE_FLOW.name);
+    if (existente) {
+      setActiveFlowId(existente.id);
+      const confirmado = await showConfirm({
+        title: "Roteiro já carregado",
+        message: `O fluxo "${existente.name}" já existe. Quer atualizar as atividades dele com o roteiro padrão? As etapas e os leads ficam no lugar, só as atividades de cada etapa são trocadas.`,
+        confirmLabel: "Atualizar atividades",
+      });
+      if (!confirmado) return;
+      await saveFlows(flows.map(f => f.id === existente.id ? { ...comRoteiroPadrao(f), origem: "sample" } : f));
+      return;
+    }
+    const clone = { ...SAMPLE_FLOW, id: uid("flow"), origem: "sample" };
     await saveFlows([...flows, clone]);
     setActiveFlowId(clone.id);
   };
