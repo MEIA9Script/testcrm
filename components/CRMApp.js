@@ -6,7 +6,8 @@ import {
   LayoutGrid, List, ArrowLeft, Check, Clock, Building2,
   Trash2, Edit3, CheckCircle2, Circle, AlertCircle,
   Sparkles, Search, Trophy, ThumbsDown, Upload, Download, FileSpreadsheet,
-  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap, Activity
+  LayoutDashboard, Briefcase, DollarSign, TrendingUp, TrendingDown, Target, LogOut, Zap, Activity,
+  Archive, ArchiveRestore, FolderInput
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useCRMData } from "../lib/useCRMData";
@@ -305,9 +306,12 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           let stageChanged = false;
           let statusChanged = false;
 
+          // a etapa antiga pode ser de outro fluxo (reativação), então procura no fluxo dela
+          const oldFlow = flows?.find(f => f.id === oldCo.flowId) || flow;
+
           if (oldCo.stageId !== nextCo.stageId) {
             stageChanged = true;
-            const oldStage = flow?.stages?.find(s => s.id === oldCo.stageId)?.name || "Desconhecida";
+            const oldStage = oldFlow?.stages?.find(s => s.id === oldCo.stageId)?.name || "Desconhecida";
             const newStage = stage?.name || "Desconhecida";
             nextCo.history = nextCo.history || [];
             nextCo.history.push({ id: uid("h"), type: "auto", title: `Movido de etapa: ${oldStage} → ${newStage}`, at: new Date().toISOString(), channel: "system" });
@@ -325,7 +329,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
               triggerWebhook(webhookConfig, 'on_status_changed', { company: nextCo, ...webhookExtras });
             }
             if (stageChanged && !statusChanged) {
-              const oldStage = flow?.stages?.find(s => s.id === oldCo.stageId);
+              const oldStage = oldFlow?.stages?.find(s => s.id === oldCo.stageId);
               triggerWebhook(webhookConfig, 'on_stage_changed', {
                 company: nextCo,
                 ...webhookExtras,
@@ -399,7 +403,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
         // Fallback: extrai a view da URL
         const path = window.location.pathname.replace('/', '') || 'dashboard';
         const params = new URLSearchParams(window.location.search);
-        const validViews = ['dashboard', 'list', 'kanban', 'flows', 'negocios', 'config', 'company'];
+        const validViews = ['dashboard', 'list', 'kanban', 'flows', 'negocios', 'arquivadas', 'config', 'company'];
         if (validViews.includes(path)) {
           setView(path);
           setActiveCompanyId(params.get("id") || null);
@@ -488,9 +492,11 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
   }
 
   const activeCompany = companies.find(c => c.id === activeCompanyId);
+  // Arquivada some de todas as telas do dia a dia; só aparece na aba Arquivadas.
+  const naoArquivadas = companies.filter(c => !c.archived);
+  const arquivadas = companies.filter(c => c.archived);
   // Funil ativo = não ganho nem perdido. "Negócios" = ganho ou perdido.
-  const pipelineCompanies = companies.filter(c => c.status !== "ganho" && c.status !== "perdido");
-  const dealCompanies = companies.filter(c => c.status === "ganho" || c.status === "perdido");
+  const pipelineCompanies = naoArquivadas.filter(c => c.status !== "ganho" && c.status !== "perdido");
 
   return (
     <div style={{ background: "#07090F", minHeight: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", color: "#E2E8F0" }}>
@@ -515,7 +521,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
 
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px" }}>
         {view === "dashboard" && (
-          <DashboardView companies={companies} flows={flows} setView={setView} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
+          <DashboardView companies={naoArquivadas} flows={flows} setView={setView} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} />
         )}
         {view === "list" && (
           <ListView companies={pipelineCompanies} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} />
@@ -527,7 +533,14 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           <FlowsView flows={flows} saveFlows={handleSaveFlows} companies={companies} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} showAlert={showAlert} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
+          <NegociosView companies={naoArquivadas} allCompanies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
+        )}
+        {view === "arquivadas" && (
+          <ArquivadasView
+            companies={arquivadas} allCompanies={companies} flows={flows}
+            onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }}
+            saveCompanies={handleSaveCompanies} showConfirm={showConfirm}
+          />
         )}
         {view === "config" && (
           <ConfigView
@@ -567,8 +580,8 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
       )}
 
       {showSearch && (
-        <GlobalSearchModal 
-          companies={companies} 
+        <GlobalSearchModal
+          companies={naoArquivadas}
           onClose={() => setShowSearch(false)} 
           onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} 
         />
@@ -664,6 +677,7 @@ function TopBar({ view, setView, onNewCompany, onSearch, companyCount, onLogout 
     { key: "kanban", label: "Kanban", Icon: LayoutGrid },
     { key: "flows", label: "Automações", Icon: Zap },
     { key: "negocios", label: "Negócios", Icon: Briefcase },
+    { key: "arquivadas", label: "Arquivadas", Icon: Archive },
     { key: "config", label: "Config", Icon: FileSpreadsheet },
   ];
   return (
@@ -1417,7 +1431,7 @@ function StatCard({ label, value, sub, color, Icon }) {
    NEGÓCIOS VIEW — won/lost companies, separate from pipeline
    ============================================================ */
 
-function NegociosView({ companies, onOpenCompany, saveCompanies, showConfirm }) {
+function NegociosView({ companies, allCompanies, onOpenCompany, saveCompanies, showConfirm }) {
   const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -1442,7 +1456,7 @@ function NegociosView({ companies, onOpenCompany, saveCompanies, showConfirm }) 
   const deleteSelected = async () => {
     const confirmed = await showConfirm({ title: "Excluir empresas", message: `Tem certeza que deseja excluir ${selectedIds.size} empresa(s)?`, confirmLabel: "Excluir", confirmColor: "#F87171" });
     if (!confirmed) return;
-    const next = companies.filter(c => !selectedIds.has(c.id));
+    const next = allCompanies.filter(c => !selectedIds.has(c.id));
     await saveCompanies(next);
     setSelectedIds(new Set());
   };
@@ -1515,6 +1529,256 @@ function NegociosView({ companies, onOpenCompany, saveCompanies, showConfirm }) 
         </div>
       )}
     </div>
+  );
+}
+
+/* ============================================================
+   ARQUIVADAS — leads fora do funil, com filtro e reaproveitamento
+   ============================================================ */
+
+function ArquivadasView({ companies, allCompanies, flows, onOpenCompany, saveCompanies, showConfirm }) {
+  const [busca, setBusca] = useState("");
+  const [segmento, setSegmento] = useState("all");
+  const [statusFiltro, setStatusFiltro] = useState("all");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [importando, setImportando] = useState(false);
+
+  const trocarFiltro = (fn) => { fn(); setSelectedIds(new Set()); };
+
+  // os nichos vêm das próprias arquivadas, então a lista nunca fica desatualizada
+  const segmentos = useMemo(() => {
+    const s = new Set();
+    for (const c of companies) {
+      const v = (c.segment || "").trim();
+      if (v) s.add(v);
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [companies]);
+
+  const temSemSegmento = companies.some(c => !(c.segment || "").trim());
+
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return companies.filter(c => {
+      const seg = (c.segment || "").trim();
+      if (segmento === "__sem__" && seg) return false;
+      if (segmento !== "all" && segmento !== "__sem__" && seg !== segmento) return false;
+
+      if (statusFiltro === "aberto" && (c.status === "ganho" || c.status === "perdido")) return false;
+      if ((statusFiltro === "ganho" || statusFiltro === "perdido") && c.status !== statusFiltro) return false;
+
+      if (termo) {
+        const alvo = `${c.name || ""} ${seg} ${c.phone || ""} ${c.email || ""} ${c.decisor || ""}`.toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
+      return true;
+    });
+  }, [companies, busca, segmento, statusFiltro]);
+
+  const sorted = useMemo(
+    () => [...filtradas].sort((a, b) => new Date(b.archivedAt || b.createdAt || 0) - new Date(a.archivedAt || a.createdAt || 0)),
+    [filtradas]
+  );
+
+  const toggleSelect = (id, e) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sorted.length && sorted.length > 0) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sorted.map(c => c.id)));
+  };
+
+  const marcaHistorico = (c, titulo) => ([
+    ...(c.history || []),
+    { id: uid("h"), type: "auto", title: titulo, at: new Date().toISOString(), channel: "system" },
+  ]);
+
+  const desarquivarSelecionadas = async () => {
+    const next = allCompanies.map(c => selectedIds.has(c.id)
+      ? { ...c, archived: false, archivedAt: null, history: marcaHistorico(c, "Empresa desarquivada") }
+      : c);
+    await saveCompanies(next, `${selectedIds.size} empresa(s) desarquivada(s)`);
+    setSelectedIds(new Set());
+  };
+
+  const excluirSelecionadas = async () => {
+    const confirmed = await showConfirm({
+      title: "Excluir empresas",
+      message: `Excluir ${selectedIds.size} empresa(s) de vez? Essa ação não pode ser desfeita.`,
+      confirmLabel: "Excluir", confirmColor: "#F87171",
+    });
+    if (!confirmed) return;
+    await saveCompanies(allCompanies.filter(c => !selectedIds.has(c.id)), `${selectedIds.size} excluída(s)`);
+    setSelectedIds(new Set());
+  };
+
+  const importarParaFluxo = async (flowId, startDate) => {
+    const flow = flows.find(f => f.id === flowId);
+    if (!flow) return;
+    const next = allCompanies.map(c => {
+      if (!selectedIds.has(c.id)) return c;
+      // as atividades já feitas viram só histórico: o fluxo novo começa do zero
+      const historico = marcaHistorico(c, `Reativada no fluxo: ${flow.name}`)
+        .map(h => h.activityId ? { ...h, stageId: `feito:${h.stageId}` } : h);
+      return {
+        ...c,
+        archived: false, archivedAt: null,
+        flowId, stageId: flow.stages[0]?.id,
+        stageStartDate: startDate || todayISO(),
+        status: "ativo", dealValue: null, lossReason: null, dealAt: null,
+        history: historico,
+      };
+    });
+    await saveCompanies(next, `${selectedIds.size} empresa(s) no fluxo ${flow.name}`);
+    setSelectedIds(new Set());
+    setImportando(false);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ position: "relative", flex: "1 1 220px", minWidth: 180 }}>
+          <Search size={14} color="#475569" style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={busca}
+            onChange={e => trocarFiltro(() => setBusca(e.target.value))}
+            placeholder="Buscar por nome, telefone, decisor…"
+            style={{ width: "100%", background: "#0D1120", border: "1px solid #141A2B", borderRadius: 9, padding: "9px 12px 9px 32px", color: "#E2E8F0", fontSize: 12.5, outline: "none" }}
+          />
+        </div>
+
+        <select value={segmento} onChange={e => trocarFiltro(() => setSegmento(e.target.value))} style={{ ...selectStyle, width: "auto", minWidth: 170, marginBottom: 0 }}>
+          <option value="all">Todos os nichos</option>
+          {segmentos.map(s => <option key={s} value={s}>{s}</option>)}
+          {temSemSegmento && <option value="__sem__">Sem nicho</option>}
+        </select>
+
+        <select value={statusFiltro} onChange={e => trocarFiltro(() => setStatusFiltro(e.target.value))} style={{ ...selectStyle, width: "auto", minWidth: 140, marginBottom: 0 }}>
+          <option value="all">Qualquer situação</option>
+          <option value="aberto">Sem fechamento</option>
+          <option value="ganho">Ganhos</option>
+          <option value="perdido">Perdidos</option>
+        </select>
+
+        <div style={{ fontSize: 11.5, color: "#475569", fontWeight: 700 }}>
+          {sorted.length} de {companies.length}
+        </div>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", background: "#0D1120", border: "1px solid #141A2B", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#F1F5F9" }}>{selectedIds.size} selecionada(s)</div>
+          <button onClick={() => setImportando(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 7, border: "none", background: "linear-gradient(135deg, #6366F1, #38BDF8)", color: "#fff", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>
+            <FolderInput size={13} /> Mandar pra um fluxo
+          </button>
+          <button onClick={desarquivarSelecionadas} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 7, border: "1px solid #F59E0B40", background: "#F59E0B15", color: "#FCD34D", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+            <ArchiveRestore size={13} /> Desarquivar
+          </button>
+          <button onClick={excluirSelecionadas} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 7, border: "1px solid #F8717140", background: "#F8717115", color: "#FCA5A5", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+            <Trash2 size={13} /> Excluir
+          </button>
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <EmptyState text={companies.length === 0 ? "Nenhuma empresa arquivada. Arquive pela ficha da empresa." : "Nenhuma arquivada com esse filtro."} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "0 14px", marginBottom: 4 }}>
+            <button onClick={toggleSelectAll} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6, color: "#64748B", fontSize: 11, fontWeight: 700 }}>
+              {selectedIds.size === sorted.length && sorted.length > 0 ? <CheckCircle2 size={16} color="#38BDF8" /> : <Circle size={16} />}
+              Selecionar todos
+            </button>
+          </div>
+
+          {sorted.map(c => {
+            const isSelected = selectedIds.has(c.id);
+            const selo = c.status === "ganho" ? ["Ganho", "#25D366"] : c.status === "perdido" ? ["Perdido", "#F87171"] : null;
+            return (
+              <div key={c.id} onClick={() => onOpenCompany(c.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, background: isSelected ? "#1E293B" : "#0D1120",
+                border: "1px solid #141A2B", borderLeft: "3px solid #F59E0B", borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+              }}>
+                <button onClick={(e) => toggleSelect(c.id, e)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", flexShrink: 0 }}>
+                  {isSelected ? <CheckCircle2 size={18} color="#38BDF8" /> : <Circle size={18} color="#475569" />}
+                </button>
+                <Archive size={17} color="#F59E0B" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#F1F5F9", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {c.name}
+                    {c.segment && (
+                      <span style={{ padding: "3px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, background: "#38BDF820", color: "#38BDF8", textTransform: "uppercase" }}>{c.segment}</span>
+                    )}
+                    {selo && (
+                      <span style={{ padding: "3px 7px", borderRadius: 5, fontSize: 9, fontWeight: 800, background: `${selo[1]}20`, color: selo[1], textTransform: "uppercase" }}>{selo[0]}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#64748B", marginTop: 3 }}>
+                    {c.phone || "sem telefone"}
+                    {c.archivedAt && ` · arquivada em ${new Date(c.archivedAt).toLocaleDateString("pt-BR")}`}
+                  </div>
+                </div>
+                <ChevronRight size={16} color="#334155" style={{ flexShrink: 0 }} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {importando && (
+        <ImportarParaFluxoModal
+          flows={flows}
+          quantidade={selectedIds.size}
+          onClose={() => setImportando(false)}
+          onConfirm={importarParaFluxo}
+        />
+      )}
+    </div>
+  );
+}
+
+function ImportarParaFluxoModal({ flows, quantidade, onClose, onConfirm }) {
+  const [flowId, setFlowId] = useState(flows[0]?.id || "");
+  const [startDate, setStartDate] = useState(todayISO());
+
+  return (
+    <ModalShell onClose={onClose} title={`Mandar ${quantidade} empresa(s) pra um fluxo`}>
+      <div style={{ fontSize: 11.5, color: "#64748B", marginBottom: 12, lineHeight: 1.5 }}>
+        Elas saem do arquivo e voltam pro funil na primeira etapa do fluxo escolhido. O que já foi feito antes
+        continua no histórico, mas as atividades do fluxo novo começam zeradas.
+      </div>
+
+      <FieldLabel>Fluxo</FieldLabel>
+      {flows.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#F87171", background: "#7C2D1220", border: "1px solid #7C2D1240", borderRadius: 8, padding: "8px 10px" }}>
+          Crie uma automação primeiro na aba "Automações".
+        </div>
+      ) : (
+        <select value={flowId} onChange={e => setFlowId(e.target.value)} style={selectStyle}>
+          {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      )}
+
+      <FieldLabel>Início das atividades</FieldLabel>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+        <button type="button" onClick={() => setStartDate(todayISO())} style={{ fontSize: 10.5, fontWeight: 700, color: "#38BDF8", background: "#0D1E2F", border: "1px solid #1E3A5F", borderRadius: 7, padding: "6px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          Hoje
+        </button>
+      </div>
+
+      <button
+        onClick={() => onConfirm(flowId, startDate)}
+        disabled={!flowId}
+        style={{ marginTop: 18, width: "100%", padding: "11px", borderRadius: 9, border: "none", background: flowId ? "linear-gradient(135deg, #6366F1, #38BDF8)" : "#1E293B", color: flowId ? "#fff" : "#475569", fontWeight: 800, fontSize: 13.5, cursor: flowId ? "pointer" : "not-allowed" }}
+      >
+        Mandar pro fluxo
+      </button>
+    </ModalShell>
   );
 }
 
@@ -2136,6 +2400,27 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
     setShowLossModal(false);
   };
 
+  const arquivar = async () => {
+    const confirmed = await showConfirm({
+      title: "Arquivar empresa",
+      message: `Arquivar "${company.name}"? Ela sai do funil e das telas do dia a dia, mas continua guardada na aba Arquivadas — de lá dá pra mandar pra outro fluxo depois.`,
+      confirmLabel: "Arquivar", confirmColor: "#F59E0B",
+    });
+    if (!confirmed) return;
+    await update({
+      archived: true, archivedAt: new Date().toISOString(),
+      history: [...(company.history || []), { id: uid("h"), type: "auto", title: "Empresa arquivada", at: new Date().toISOString(), channel: "system" }],
+    }, "Empresa arquivada");
+    onBack();
+  };
+
+  const desarquivar = async () => {
+    await update({
+      archived: false, archivedAt: null,
+      history: [...(company.history || []), { id: uid("h"), type: "auto", title: "Empresa desarquivada", at: new Date().toISOString(), channel: "system" }],
+    }, "Empresa desarquivada");
+  };
+
   const deleteCompany = async () => {
     const confirmed = await showConfirm({ title: "Excluir empresa", message: `Excluir "${company.name}"? Essa ação não pode ser desfeita.`, confirmLabel: "Excluir", confirmColor: "#F87171" });
     if (!confirmed) return;
@@ -2204,9 +2489,23 @@ function CompanyView({ company, flows, companies, lossReasons, saveCompanies, sa
           {isClosed && (
             <IconButton onClick={reactivate} icon={Sparkles} label="Reabrir negócio" accent="#38BDF8" />
           )}
+          {company.archived ? (
+            <IconButton onClick={desarquivar} icon={ArchiveRestore} label="Desarquivar" accent="#F59E0B" />
+          ) : (
+            <IconButton onClick={arquivar} icon={Archive} label="Arquivar" accent="#F59E0B" />
+          )}
           <IconButton onClick={deleteCompany} icon={Trash2} label="Excluir" accent="#F87171" />
         </div>
       </div>
+
+      {company.archived && (
+        <div style={{ background: "#78350F30", border: "1px solid #F59E0B40", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <Archive size={18} color="#F59E0B" style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: 13, color: "#FCD34D" }}>
+            <strong>Empresa arquivada</strong>{company.archivedAt && ` em ${new Date(company.archivedAt).toLocaleDateString("pt-BR")}`} — fora do funil e das telas do dia a dia.
+          </div>
+        </div>
+      )}
 
       {company.status === "ganho" && (
         <div style={{ background: "#052e1640", border: "1px solid #25D36640", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
