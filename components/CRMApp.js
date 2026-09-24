@@ -533,7 +533,7 @@ export default function CRMApp({ initialView = "dashboard", initialCompanyId = n
           <FlowsView flows={flows} saveFlows={handleSaveFlows} companies={companies} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} showAlert={showAlert} />
         )}
         {view === "negocios" && (
-          <NegociosView companies={naoArquivadas} allCompanies={companies} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
+          <NegociosView companies={naoArquivadas} allCompanies={companies} flows={flows} onOpenCompany={(id) => { setActiveCompanyId(id); setView("company"); }} saveCompanies={handleSaveCompanies} showConfirm={showConfirm} />
         )}
         {view === "arquivadas" && (
           <ArquivadasView
@@ -1431,11 +1431,13 @@ function StatCard({ label, value, sub, color, Icon }) {
    NEGÓCIOS VIEW — won/lost companies, separate from pipeline
    ============================================================ */
 
-function NegociosView({ companies, allCompanies, onOpenCompany, saveCompanies, showConfirm }) {
+function NegociosView({ companies, allCompanies, flows, onOpenCompany, saveCompanies, showConfirm }) {
   const [filter, setFilter] = useState("all"); // all | criado | ganho | perdido
+  const [fluxoFiltro, setFluxoFiltro] = useState("all");
   const [selectedIds, setSelectedIds] = useState(new Set());
 
-  const filtered = filter === "all" ? companies : filter === "criado" ? companies.filter(c => c.status !== "ganho" && c.status !== "perdido") : companies.filter(c => c.status === filter);
+  const porStatus = filter === "all" ? companies : filter === "criado" ? companies.filter(c => c.status !== "ganho" && c.status !== "perdido") : companies.filter(c => c.status === filter);
+  const filtered = fluxoFiltro === "all" ? porStatus : porStatus.filter(c => c.flowId === fluxoFiltro);
   const sorted = [...filtered].sort((a, b) => new Date(b.dealAt || b.createdAt || 0) - new Date(a.dealAt || a.createdAt || 0));
 
   const totalGanho = companies.filter(c => c.status === "ganho").reduce((s, c) => s + (Number(c.dealValue) || 0), 0);
@@ -1461,6 +1463,22 @@ function NegociosView({ companies, allCompanies, onOpenCompany, saveCompanies, s
     setSelectedIds(new Set());
   };
 
+  const arquivarSelecionadas = async () => {
+    const confirmed = await showConfirm({
+      title: "Arquivar empresas",
+      message: `Arquivar ${selectedIds.size} empresa(s)? Elas saem das telas do dia a dia e vão pra aba Arquivadas, de onde dá pra mandar pra outro fluxo depois.`,
+      confirmLabel: "Arquivar", confirmColor: "#F59E0B",
+    });
+    if (!confirmed) return;
+    const agora = new Date().toISOString();
+    const next = allCompanies.map(c => selectedIds.has(c.id)
+      ? { ...c, archived: true, archivedAt: agora,
+          history: [...(c.history || []), { id: uid("h"), type: "auto", title: "Empresa arquivada", at: agora, channel: "system" }] }
+      : c);
+    await saveCompanies(next, `${selectedIds.size} empresa(s) arquivada(s)`);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -1472,12 +1490,26 @@ function NegociosView({ companies, allCompanies, onOpenCompany, saveCompanies, s
             }}>{l}</button>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={fluxoFiltro}
+            onChange={e => { setFluxoFiltro(e.target.value); setSelectedIds(new Set()); }}
+            style={{ ...selectStyle, width: "auto", minWidth: 165, marginBottom: 0, fontSize: 12 }}
+          >
+            <option value="all">Todas as cadências</option>
+            {(flows || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <div style={{ fontSize: 11.5, color: "#475569", fontWeight: 700 }}>{sorted.length} de {companies.length}</div>
           <div style={{ fontSize: 12.5, color: "#25D366", fontWeight: 800 }}>Total ganho: {fmtBRL(totalGanho)}</div>
           {selectedIds.size > 0 && (
-            <button onClick={deleteSelected} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 6, border: "1px solid #F8717140", background: "#F8717115", color: "#FCA5A5", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-              <Trash2 size={13} /> Excluir ({selectedIds.size})
-            </button>
+            <>
+              <button onClick={arquivarSelecionadas} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 6, border: "1px solid #F59E0B40", background: "#F59E0B15", color: "#FCD34D", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <Archive size={13} /> Arquivar ({selectedIds.size})
+              </button>
+              <button onClick={deleteSelected} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 6, border: "1px solid #F8717140", background: "#F8717115", color: "#FCA5A5", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <Trash2 size={13} /> Excluir ({selectedIds.size})
+              </button>
+            </>
           )}
         </div>
       </div>
